@@ -4,3 +4,10 @@ __pycache__/
 .DS_Store
 venv/
 .env
+
+/Dataset\ #1/
+/zip/
+/data/
+
+Gait-Datasets-TIFS20
+*.zip
