@@ -5,4 +5,9 @@ __pycache__/
 venv/
 .env
 
+/Dataset\ #1/
+/zip/
+/data/
+
 Gait-Datasets-TIFS20
+*.zip
