@@ -1,0 +1,32 @@
+\section{Proposed Preprocessing}
+% \begin{itemize}
+%     \item What preprocessing steps will you be doing?
+%     \item Will you use normalization?
+%     \item Will you use feature extraction?
+%     \item Will you use dimensionality reduction or feature selection?
+%     \item Will you use value imputation for NaNs or other bad data?
+%     \item How will you split your data?
+%     \item How will you deal with class imbalance?
+%     \item Is there anything very specific to your topic that needs preprocessing?
+%     \item Which methods will you be using and why?
+%     \item Where possible, how do these choices connect to your findings from Questions 1 and 2?
+%     \item Make sure it is very clear to the reader what will happen.
+%     \item \textbf{Required:} The proposed preprocessing steps.
+%     \item \textbf{Recommended:} 1 draw.io flowchart that shows the preprocessing steps and their order.
+% \end{itemize}
+
+We plan to:
+\begin{itemize}
+    \item filter out obvious sensor anomalies or corrupted values if they appear;
+    \item split the data by participant rather than randomly, so that the same person does not appear in both training and test data;
+    \item avoid the original paper's percentage-based split across each participant and instead enforce subject segregation;
+    \item apply per-channel z-score normalization using statistics computed only on the training data;
+    \item use subject-group $K$-fold cross-validation by dividing the 180 subjects into groups and folding by subject group;
+    \item train on most subject groups, then for each test participant use a small amount of data to build the owner embedding and reserve the rest for testing;
+    \item compare two preprocessing directions: using raw windows directly for deep learning, or doing feature engineering first;
+    \item consider time-domain features such as mean, standard deviation, energy, turning points, and range, as well as frequency-domain features such as FFT band energy, dominant frequency, and spectral entropy;
+    \item clip extreme values if we observe unrealistic sensor readings, although we have not seen obvious cases yet;
+    \item consider time warping as a data augmentation method, although some temporal alignment is already handled through interpolation;
+    \item decide whether to follow the paper's compound-acceleration peak detection and two-step segmentation, or instead use broader movement windows if they capture more useful information; and
+    \item select random adversarial or impostor subjects for each point so that each example is explicitly compared against someone it is not.
+\end{itemize}

@@ -1,0 +1,16 @@
+\section{Preliminary Data Exploration}
+% \begin{itemize}
+%     \item Which features are in your dataset?
+%     \item How are your features distributed?
+%     \item Are some of your features correlated with each other or with the target label?
+%     \item How many classes are there and are they balanced?
+%     \item Does some of the information here contradict or confirm prior domain knowledge?
+%     \item Are there any missing values, or outliers in your data?
+%     \item Which plots will you include to show what your dataset is all about?
+%     \item Don't forget to interpret your plots.
+%     \item \textbf{Required:} 1 dimensionality reduced plot, 2 other plots.
+% \end{itemize}
+
+The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. Since the task we are framing is a yes/no verification problem, the class balance can be controlled during training by pairing each positive example with a negative comparison example.
+
+There is naturally correlation in the data because these channels represent different axes in the same physical space, but this is not necessarily a limitation. Instead, the channels are complementary because together they capture spatial information about the motion of a step and its effect on acceleration and rotation. This generally supports our original expectations rather than contradicting them.

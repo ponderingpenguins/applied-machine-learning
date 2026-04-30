@@ -1,0 +1,19 @@
+\section{Proposed Evaluation}
+% \begin{itemize}
+%     \item How will you assess your model(s) in the end?
+%     \item Which quantitative metrics will you use for predictive performance?
+%     \item Will you include accuracy, F1, AUROC, MAE, MSE, or other metrics?
+%     \item Will you use things that reflect system behavior, such as confusion matrices?
+%     \item How will you evaluate beyond predictive performance?
+%     \item Will you consider train cost, inference cost, model size, or social biases?
+%     \item How will you detect overfitting or underfitting?
+%     \item \textbf{Required:} At least one quantitative metric for predictive performance.
+%     \item \textbf{Required:} At least one other evaluation.
+% \end{itemize}
+
+\begin{itemize}
+    \item \textbf{Metrics:} accuracy, precision, recall, F1 score, confusion matrix, $K$-fold comparison, and AUROC.
+    \item \textbf{Evaluation of learned patterns:} for FFT-based features, we can inspect which frequencies are most useful for distinguishing between different pocket placements. We can visualize these features with a bar plot or heatmap to better understand what contributes to the model's predictions.
+    \item \textbf{Embedding visualization:} we want to visualize the embedding space to better understand what the model is using to separate users. If possible, we may also use methods similar to Grad-CAM or other interpretability tools.
+    \item \textbf{Evaluation with new data:} we will record new data from a few volunteers who were not part of the original dataset. They will carry the phone in different pockets while walking, and we will use this data to evaluate the trained model. This should give us a better understanding of how well the model generalizes to new people and more realistic scenarios.
+\end{itemize}

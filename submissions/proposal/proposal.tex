@@ -1,0 +1,34 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper]{geometry}
+\usepackage{colortbl}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8\baselineskip}
+
+\title{Project Proposal: Smartphone Gait-Based Owner Verification}
+\author{Efe Ozbal - S5996821 \\
+        Sigurdur Haukur Birgisson - S5982960 \\ 
+        Tijje Steeman - S5333644 \\
+        Will Meeus - S}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\newcommand{\proposalinput}[1]{%
+	\IfFileExists{sections/#1}{\input{sections/#1}}{\input{submissions/proposal/sections/#1}}%
+}
+
+\proposalinput{section-01-preliminary-domain-knowledge.tex}
+\proposalinput{section-02-preliminary-data-exploration.tex}
+\proposalinput{section-03-proposed-preprocessing.tex}
+\proposalinput{section-04-proposed-models-and-baseline.tex}
+\proposalinput{section-05-proposed-evaluation.tex}
+\proposalinput{section-06-model-usage.tex}
+\proposalinput{section-07-risk-assessment.tex}
+\proposalinput{section-08-individual-learning-outcomes.tex}
+\proposalinput{section-09-relation-to-grading-specifications.tex}
+\proposalinput{section-10-timeline.tex}
+\proposalinput{section-11-contributions.tex}
+
+\end{document}
