@@ -11,9 +11,16 @@
 %     \item \textbf{Required:} At least one other evaluation.
 % \end{itemize}
 
-\begin{itemize}
-    \item \textbf{Metrics:} accuracy, precision, recall, F1 score, confusion matrix, $K$-fold comparison, and AUROC.
-    \item \textbf{Evaluation of learned patterns:} for FFT-based features, we can inspect which frequencies are most useful for distinguishing between different pocket placements. We can visualize these features with a bar plot or heatmap to better understand what contributes to the model's predictions.
-    \item \textbf{Embedding visualization:} we want to visualize the embedding space to better understand what the model is using to separate users. If possible, we may also use methods similar to Grad-CAM or other interpretability tools.
-    \item \textbf{Evaluation with new data:} we will record new data from a few volunteers who were not part of the original dataset. They will carry the phone in different pockets while walking, and we will use this data to evaluate the trained model. This should give us a better understanding of how well the model generalizes to new people and more realistic scenarios.
-\end{itemize}
+%\begin{itemize}
+%    \item \textbf{Metrics:} for the verification task, we will focus on false acceptance rate (FAR), false rejection rate (FRR), and equal error rate (EER). We may still report accuracy, precision, recall, F1 score, confusion matrices, and AUROC as secondary metrics when they help with comparison.
+%    \item \textbf{Evaluation of learned patterns:} for FFT-based features, we can inspect which frequencies are most useful for distinguishing between different pocket placements. We can visualize these features with a bar plot or heatmap to better understand what contributes to the model's predictions.
+%    \item \textbf{Embedding visualization:} we want to visualize the embedding space to better understand what the model is using to separate users. If possible, we may also use methods similar to Grad-CAM or other interpretability tools.
+%    \item \textbf{Evaluation with new data:} we will record new data from a few volunteers who were not part of the original dataset. They will carry the phone in different pockets while walking, and we will use this data to evaluate how well the trained model generalizes to new people and more realistic scenarios.
+%\end{itemize}
+
+
+For the main verification task, we will evaluate the model primarily with false acceptance rate (FAR), false rejection rate (FRR), and equal error rate (EER), because these metrics directly reflect how well the system accepts genuine users and rejects impostors. We may still report accuracy, precision, recall, F1 score, confusion matrices, and AUROC as secondary metrics when they help with comparison, but these are less central to the verification setting than FAR and FRR.
+
+We also want to understand what the model is learning, not only how well it performs. For the FFT-based baseline, we can inspect which frequency components are most useful for separating different pocket placements and visualize them with bar plots or heatmaps. For the transformer model, we want to visualize the embedding space to see how well the model separates users, and, if possible, we may also use additional interpretability tools to inspect what parts of the input are driving its decisions.
+
+Finally, we will evaluate the model on new data that we record from a few volunteers who were not part of the original dataset. They will carry the phone in different pockets while walking, and we will use this data to check how well the trained model generalizes to new people and to more realistic deployment conditions. This will give us a more practical sense of whether the system is robust outside the original training data. Given our deployment plan, this will initially mean sending data to our endpoint, but eventually it will mean live use on a simple app on a phone.
