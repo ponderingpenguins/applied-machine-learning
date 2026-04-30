@@ -7,10 +7,10 @@ name = "applied-machine-learning"
 version = "0.1.0"
 description = "Gait Classification Assignment Applied ML"
 authors = [
-	{ name = "Haukur Sigurdur" },
+	{ name = "Haukur Sigurdur", email = "efeozbal01@gmail.com"},
 	{ name = "Efe Ozbal" },
 	{ name = "Will Meeus", email = "will.meeus@gmail.com" },
-	{ name = "Tijje Steeman" },
+	{ name = "Tijje Steeman", email = "tijjesteeman@gmail.com" },
 ]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -36,7 +36,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/gait_classification"]
+packages = ["gait_classification"]
 
 [tool.black]
 line-length = 100
