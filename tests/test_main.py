@@ -1,5 +1,5 @@
 import unittest
-from src.gait_classification.main import hello_world
+from main import hello_world
 
 
 class MainTest(unittest.TestCase):
