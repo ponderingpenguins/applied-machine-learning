@@ -11,7 +11,7 @@
 %     \item \textbf{Required:} 1 dimensionality reduced plot, 2 other plots.
 % \end{itemize}
 
-The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time, where Figure \ref{fig:raw_signals} shows an example sample. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. As an exploration, we applied a low-pass filter to the raw signals to reduce noise, as shown in Figure \ref{fig:smoothed_signals}. Since the task we are framing is a binary verification problem, the class balance can be controlled during training by pairing each positive example with a negative comparison example.
+The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time, where Figure \ref{fig:raw_signals} shows an example sample. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. As an exploration, we applied a low-pass filter to the raw signals to reduce noise, as shown in Figure \ref{fig:smoothed_signals}. Since we frame the task as open-set verification, class balance during training can be controlled by balancing genuine and impostor comparisons within each fold.
 
 \begin{figure}[ht]
     \centering

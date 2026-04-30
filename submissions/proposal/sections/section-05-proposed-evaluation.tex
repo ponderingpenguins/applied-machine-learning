@@ -19,7 +19,7 @@
 %\end{itemize}
 
 
-For the main verification task, we will evaluate the model primarily with false acceptance rate (FAR), false rejection rate (FRR), and equal error rate (EER), because these metrics directly reflect how well the system accepts genuine users and rejects impostors. We may still report accuracy, precision, recall, F1 score, confusion matrices, and AUROC as secondary metrics when they help with comparison, but these are less central to the verification setting than FAR and FRR.
+For the main open-set verification task, we will evaluate the model primarily with false acceptance rate (FAR), false rejection rate (FRR), and equal error rate (EER), because these metrics directly reflect how well the system accepts genuine users and rejects impostors. We may still report accuracy, precision, recall, F1 score, confusion matrices, and AUROC as secondary metrics when they help with comparison, but these are less central to the verification setting than FAR and FRR.
 
 We also want to understand what the model is learning, not only how well it performs. For the FFT-based baseline, we can inspect which frequency components are most useful for separating different pocket placements and visualize them with bar plots or heatmaps. For the transformer model, we want to visualize the embedding space to see how well the model separates users, and, if possible, we may also use additional interpretability tools to inspect what parts of the input are driving its decisions.
 
