@@ -41,7 +41,7 @@ plt.xlabel("Time (s)")
 plt.ylabel("Angular Velocity (deg/s)")
 plt.legend()
 plt.tight_layout()
-plt.savefig("src/gait_classification/figures/raw_signals.png")
+plt.savefig("gait_classification/figures/raw_signals.png")
 
 
 # Smoothing via FFT low-pass filter
@@ -85,4 +85,4 @@ plt.xlabel("Time (s)")
 plt.ylabel("Angular Velocity (rad/s)")
 plt.legend()
 plt.tight_layout()
-plt.savefig("src/gait_classification/figures/smoothed_signals.png")
+plt.savefig("gait_classification/figures/smoothed_signals.png")
