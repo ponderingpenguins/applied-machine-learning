@@ -15,18 +15,25 @@
 %     \item \textbf{Recommended:} 1 draw.io flowchart that shows the preprocessing steps and their order.
 % \end{itemize}
 
-We plan to:
-\begin{itemize}
-    \item filter out obvious sensor anomalies or corrupted values if they appear;
-    \item split the data by participant rather than randomly, so that the same person does not appear in both training and test data;
-    \item avoid the original paper's percentage-based split across each participant and instead enforce subject segregation;
-    \item apply per-channel z-score normalization using statistics computed only on the training data;
-    \item use subject-group $K$-fold cross-validation by dividing the 180 subjects into groups and folding by subject group;
-    \item train on most subject groups, then for each test participant use a small amount of data to build the owner embedding and reserve the rest for testing;
-    \item compare two preprocessing directions: using raw windows directly for deep learning, or doing feature engineering first;
-    \item consider time-domain features such as mean, standard deviation, energy, turning points, and range, as well as frequency-domain features such as FFT band energy, dominant frequency, and spectral entropy;
-    \item clip extreme values if we observe unrealistic sensor readings, although we have not seen obvious cases yet;
-    \item consider time warping as a data augmentation method, although some temporal alignment is already handled through interpolation;
-    \item decide whether to follow the paper's compound-acceleration peak detection and two-step segmentation, or instead use broader movement windows if they capture more useful information; and
-    \item select random adversarial or impostor subjects for each point so that each example is explicitly compared against someone it is not.
-\end{itemize}
+%We plan to:
+%\begin{itemize}
+%    \item filter out obvious sensor anomalies or corrupted values if they appear;
+%    \item split the data by participant rather than randomly, so that the same person does not appear in both training and test data;
+%    \item avoid the original paper's percentage-based split across each participant and instead enforce subject segregation;
+%    \item apply per-channel z-score normalization using statistics computed only on the training data;
+%    \item use subject-group $K$-fold cross-validation by dividing the 180 subjects into groups and folding by subject group;
+%    \item train on most subject groups, then for each test participant use a small amount of data to build the owner embedding and reserve the rest for testing;
+%    \item compare two preprocessing directions: using raw windows directly for deep learning, or doing feature engineering first;
+%    \item consider time-domain features such as mean, standard deviation, energy, turning points, and range, as well as frequency-domain features such as FFT band energy, dominant frequency, and spectral entropy;
+%    \item clip extreme values if we observe unrealistic sensor readings, although we have not seen obvious cases yet;
+%    \item consider time warping as a data augmentation method, although some temporal alignment is already handled through interpolation;
+%    \item decide whether to follow the paper's compound-acceleration peak detection and two-step segmentation, or instead use broader movement windows if they capture more useful information; and
+%    \item select random adversarial or impostor subjects for each point so that each example is explicitly compared against someone it is not.
+%\end{itemize}
+
+
+We would like to propose a preprocessing pipeline which is organized into two stages. First, we will apply a shared pipeline for all experiments, starting with data quality checks. Since we have checked that there are no missing values, we will look for any outliers and sensor artifacts (flatline sections or implausible accelerometer/gyroscope spikes) to confirm the cleanliness of the data. We will apply segmentation on the raw data, and each sample will be represented as a segmented window. We will segment windows following the original paper's segmentation strategy, which uses cumulative acceleration to identify each 2-step window, which are of variable length. To create a fixed-length representation, we will apply linear interpolation to produce windows of length 128, so the network always receives a constant temporal input size regardless of walking speed. The motivation for this is that many papers, including the original, have found that using meaningful segmentations improves predictive accuracy.
+
+After, in a different approach than the original paper, we will use strict subject-level splitting to avoid identity leakage. We think this is the safest approach, with clean separation maintained throughout by participant. We will use a 90/10 data split for train/test, with the training set used to construct $k\sim5$ folds by subject groups with 80/20 for training and validation, which gives us good averaging across validation folds. The full training set will be used later. This depends on the training intensity we find; we may adjust the $k$ value accordingly. We will use per-channel z-score normalization computed only on the training partition and then reused for validation and test data. We will have to precompute the folds since the z-score will be specific for the validation run, then the test set z-score computed on the full training set statistics. We will also keep segmentation and interpolation consistent across splits so that comparisons between models are fair.
+
+After this shared stage, we branch by model type. For the baseline model, we will prepare manually computed time-domain or frequency-domain features per window (such as mean, standard deviation, energy, turning points, and range, or FFT band energy, dominant frequency, and spectral entropy), and then perform model-specific feature selection during baseline testing. We have already experimented with FFT features ranked by importance to prediction with success. For the main deep-learning track, we will use the segmented 128-length windows directly, and also test whether feature selection benefits the deeper model. As an important distinction, we have chosen not to construct triplet pairs during preprocessing. This is motivated by wanting to test different sampling strategies, such as random selection, hard negative mining, and batch-level negatives, and to decide later based on efficiency.
