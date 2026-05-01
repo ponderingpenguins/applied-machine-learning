@@ -1,17 +1,19 @@
-\section{Preliminary Data Exploration}
+    \section{Preliminary Data Exploration}
 % \begin{itemize}
-%     \item Which features are in your dataset?
+%     \item x Which features are in your dataset?
 %     \item How are your features distributed?
-%     \item Are some of your features correlated with each other or with the target label?
-%     \item How many classes are there and are they balanced?
-%     \item Does some of the information here contradict or confirm prior domain knowledge?
-%     \item Are there any missing values, or outliers in your data?
-%     \item Which plots will you include to show what your dataset is all about?
+%     \item x Are some of your features correlated with each other or with the target label?
+%     \item ? How many classes are there and are they balanced?
+%     \item x Does some of the information here contradict or confirm prior domain knowledge?
+%     \item x Are there any missing values, or outliers in your data?
+%     \item x Which plots will you include to show what your dataset is all about?
 %     \item Don't forget to interpret your plots.
 %     \item \textbf{Required:} 1 dimensionality reduced plot, 2 other plots.
 % \end{itemize}
 
-The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time, where Figure \ref{fig:axes} shows the sensor axes. Figure \ref{fig:raw_signals} shows an example signal. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. As an exploration, we applied a low-pass filter to the raw signals to reduce noise, as shown in Figure \ref{fig:smoothed_signals}. Since the task we are framing is a binary verification problem, the class balance can be controlled during training by pairing each positive example with a negative comparison example.
+The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time, where Figure \ref{fig:axes} shows the sensor axes. Figure \ref{fig:raw_signals} shows an example signal. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. As an attempt to filter out the high-frequency noise, we applied a low-pass filter to the raw signals, as shown in Figure \ref{fig:smoothed_signals}. Both raw and smoothed signals show a periodic pattern that is expected from the previous domain knowledge of the walking motion. Hence, we will extract features from frequency domain.
+
+Other possible features we consider are the absolute acceleration, which is computed as $\sqrt{ACC_x^2 + ACC_y^2 + ACC_z^2}$, and absolute angular velocity, which is computed as $\sqrt{GYR_x^2 + GYR_y^2 + GYR_z^2}$. These features are expected to be informative because they capture the overall magnitude of acceleration and angular velocity regardless of direction, which can be indicative of the intensity and dynamics of the walking motion. 
 
 \begin{figure}[H]
     \centering
@@ -38,11 +40,13 @@ The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-ax
     \label{fig:signal_examples}
 \end{figure}
 
+Since the task we are framing is a one-vs-rest verification problem, the class balance can be controlled during training by pairing each positive example with a negative comparison example.
+
 % There is naturally correlation in the data because these channels represent different axes in the same physical space, but this is not necessarily a limitation. Instead, the channels are complementary because together they capture spatial information about the motion of a step and its effect on acceleration and rotation. This generally supports our original expectations rather than contradicting them.
 
-We also computed the correlation matrix of the six sensor channels, which is shown in Figure \ref{fig:correlation}. Even though majority of absolute value of channel correlations are close to zero (< 0.1), there can be seen a slight positive correlation of 0.355 between GYR$_x$ and ACC$_z$. They are predicted to be correlated because both channels are influenced by the inward motion of the leg during walking, where GYR$_x$ captures the femur rotation and ACC$_z$ captures the vertical acceleration from leg lifting.
+We also computed the correlation matrix of the six sensor channels, which is shown in Figure \ref{fig:correlation}. Even though majority of absolute value of channel correlations are close to zero (< 0.1), there can be seen a slight positive correlation of 0.355 between GYR$_x$ and ACC$_z$. They are predicted to be correlated because both channels are influenced by the inward motion of the leg during stepping forward, where GYR$_x$ captures the femur rotation and ACC$_z$ captures the vertical acceleration from leg lifting.
 
-Accompanying it, there is a negative correlation of -0.229 between GYR$_z$ and ACC$_x$, which can be explained by the swinging motion of the leg during walking. 
+Accompanying it, there is a negative correlation of -0.229 between GYR$_z$ and ACC$_x$, which can be explained by the swinging motion of the leg during walking. Lastly, the correlation of 0.153 between ACC$_z$ and ACC$_y$ is believed to be, again, due to the inward motion of the leg during stepping forward. It should be noted that these correlations are weak and could be due to random chance.
 
 \begin{figure}[H]
     \centering
@@ -50,3 +54,5 @@ Accompanying it, there is a negative correlation of -0.229 between GYR$_z$ and A
     \caption{Correlation Matrix of Sensor Readings}
     \label{fig:correlation}
 \end{figure}
+
+There is no missing data or outliers in the dataset.
