@@ -15,7 +15,7 @@ During development, we may encounter issues on several fronts. As transformer mo
 
 To mitigate these risks, we adopt several strategies. To prevent data leakage, as mentioned in previous sections, we will split the data by subject so that no sensor data from a test subject appears in training. To address model complexity, we will start with a smaller transformer architecture and only increase complexity if necessary, using the baseline model as a reference. We will also apply regularization techniques such as dropout and early stopping to prevent overfitting.
 
-To prepare for deployment challenges early, we plan to study projects such as the web \texttt{fake beer} drinking app to understand how live streaming sensor data is handled. Finally, to minimize privacy risks from live data, we would prefer to keep the system on-device rather than stream sensor data to a server, thereby reducing the risk of data breaches and privacy violations.
+To prepare for deployment challenges early, we plan to study projects such as the web fake beer drinking app to understand how live streaming sensor data is handled. Finally, to minimize privacy risks from live data, we would prefer to keep the system on-device rather than stream sensor data to a server, thereby reducing the risk of data breaches and privacy violations.
 
 The project is likely to be successful in terms of model accuracy, since the task has already been shown to be feasible with high accuracy. What is less certain is how viable the approach will be once compression and deployment constraints are introduced.
 
