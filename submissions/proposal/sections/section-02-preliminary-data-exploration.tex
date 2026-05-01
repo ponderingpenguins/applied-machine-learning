@@ -40,8 +40,6 @@ Other possible features we consider are the absolute acceleration, which is comp
     \label{fig:signal_examples}
 \end{figure}
 
-Since the task we are framing is a one-vs-rest verification problem, the class balance can be controlled during training by pairing each positive example with a negative comparison example.
-
 % There is naturally correlation in the data because these channels represent different axes in the same physical space, but this is not necessarily a limitation. Instead, the channels are complementary because together they capture spatial information about the motion of a step and its effect on acceleration and rotation. This generally supports our original expectations rather than contradicting them.
 
 We also computed the correlation matrix of the six sensor channels, which is shown in Figure \ref{fig:correlation}. Even though majority of absolute value of channel correlations are close to zero (< 0.1), there can be seen a slight positive correlation of 0.355 between GYR$_x$ and ACC$_z$. They are predicted to be correlated because both channels are influenced by the inward motion of the leg during stepping forward, where GYR$_x$ captures the femur rotation and ACC$_z$ captures the vertical acceleration from leg lifting.
@@ -65,3 +63,10 @@ As a dimensionality reduction attempt, we applied t-SNE, with 118 classes (one f
 \end{figure}
 
 There is no missing data in the dataset. Regarding outliers, we observe that the sensor readings fall outside typical ranges, particularly in the gyroscope channels. However, we note that outliers in gait data may represent distinctive behavioral patterns that are part of an individual's biometric fingerprint rather than measurement errors. As a behavioral biometric, gait naturally exhibits individual variation, including asymmetries and characteristic motion anomalies. We will explore the impact of outlier removal during model development but expect to retain most outliers in our final feature set, as they may be diagnostic of person-specific gait characteristics.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/outlier_precentage.png}
+    \caption{Percentage of outliers in the different channels, calculated as the greater than 1.5 IQR from the mean of each channel.}
+    \label{fig:outlier}
+\end{figure}
