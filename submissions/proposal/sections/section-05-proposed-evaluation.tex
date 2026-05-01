@@ -23,4 +23,5 @@ For the main open-set verification task, we will evaluate the model primarily wi
 
 We also want to understand what the model is learning, not only how well it performs. For the FFT-based baseline, we can inspect which frequency components are most useful for separating different pocket placements and visualize them with bar plots or heatmaps. For the transformer model, we want to visualize the embedding space to see how well the model separates users, and, if possible, we may also use additional interpretability tools to inspect what parts of the input are driving its decisions.
 
+\newpage
 Finally, we will evaluate the model on new data that we record from a few volunteers who were not part of the original dataset. They will carry the phone in different pockets while walking, and we will use this data to check how well the trained model generalizes to new people and to more realistic deployment conditions. This will give us a more practical sense of whether the system is robust outside the original training data. Given our deployment plan, this will initially mean sending data to our endpoint, but eventually it will mean live use on a simple app on a phone.
