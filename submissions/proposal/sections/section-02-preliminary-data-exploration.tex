@@ -64,4 +64,4 @@ As a dimensionality reduction attempt, we applied t-SNE, with 118 classes (one f
     \label{fig:t-sne}
 \end{figure}
 
-There is no missing data or outliers in the dataset.
+There is no missing data in the dataset. Regarding outliers, we observe that the sensor readings fall outside typical ranges, particularly in the gyroscope channels. However, we note that outliers in gait data may represent distinctive behavioral patterns that are part of an individual's biometric fingerprint rather than measurement errors. As a behavioral biometric, gait naturally exhibits individual variation, including asymmetries and characteristic motion anomalies. We will explore the impact of outlier removal during model development but expect to retain most outliers in our final feature set, as they may be diagnostic of person-specific gait characteristics.
