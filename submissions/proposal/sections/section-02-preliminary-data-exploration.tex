@@ -7,8 +7,8 @@
 %     \item x Does some of the information here contradict or confirm prior domain knowledge?
 %     \item x Are there any missing values, or outliers in your data?
 %     \item x Which plots will you include to show what your dataset is all about?
-%     \item Don't forget to interpret your plots.
-%     \item \textbf{Required:} 1 dimensionality reduced plot, 2 other plots.
+%     \item x Don't forget to interpret your plots.
+%     \item \textbf{Required:} x 1 dimensionality reduced plot, x 2 other plots.
 % \end{itemize}
 
 The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time, where Figure \ref{fig:axes} shows the sensor axes. Figure \ref{fig:raw_signals} shows an example signal. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. As an attempt to filter out the high-frequency noise, we applied a low-pass filter to the raw signals, as shown in Figure \ref{fig:smoothed_signals}. Both raw and smoothed signals show a periodic pattern that is expected from the previous domain knowledge of the walking motion. Hence, we will extract features from frequency domain.
@@ -17,7 +17,7 @@ Other possible features we consider are the absolute acceleration, which is comp
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\textwidth]{figures/axes.png}
+    \includegraphics[width=0.3\textwidth]{figures/axes.png}
     \caption{Sensor axes for accelerometer and gyroscope readings \cite{mathworks2014gyroscope}}
     \label{fig:axes}
 \end{figure}
@@ -53,6 +53,15 @@ Accompanying it, there is a negative correlation of -0.229 between GYR$_z$ and A
     \includegraphics[width=0.7\textwidth]{figures/correlation.png}
     \caption{Correlation Matrix of Sensor Readings}
     \label{fig:correlation}
+\end{figure}
+
+As a dimensionality reduction attempt, we applied t-SNE, with 118 classes (one for each embedding in our dataset), to the six sensor channels, which is shown in Figure \ref{fig:t-sne}. First thing to notice here is that the peripheral clusters are well separated from each other, indicating easier classification of those samples. However, the central cluster is mixed and dense, which is expected for a non-linear model to separate these classes.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/t-sne_experiment.png}
+    \caption{t-SNE plot of the dataset}
+    \label{fig:t-sne}
 \end{figure}
 
 There is no missing data or outliers in the dataset.
