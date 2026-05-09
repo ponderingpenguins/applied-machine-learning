@@ -1,3 +1,4 @@
+import pickle
 from curses import raw
 
 import numpy as np
@@ -133,7 +134,7 @@ def participant_split(
 
 
 def fit_scaler(
-    windows: np.ndarray, labels: np.ndarray, train_pids: np.ndarray
+    cfg: TrainConfig, windows: np.ndarray, labels: np.ndarray, train_pids: np.ndarray
 ) -> StandardScaler:
     """
     Fit a StandardScaler on training windows only.
@@ -152,6 +153,10 @@ def fit_scaler(
 
     scaler = StandardScaler()  # z-score normalization
     scaler.fit(train_windows_flat)
+
+    # Pickle and save the scaler for later use in inference
+    with open(f"{cfg.checkpoint_dir}/scaler.pkl", "wb") as f:
+        pickle.dump(scaler, f)
 
     return scaler
 

@@ -67,7 +67,7 @@ def fooberino(cfg: TrainConfig) -> None:
     )
 
     # z-score normalization using only training data statistics
-    scaler = fit_scaler(windows, labels, train_pids)
+    scaler = fit_scaler(cfg, windows, labels, train_pids)
     windows = apply_scaler(windows, scaler)
 
     train_mask = np.isin(labels, train_pids)

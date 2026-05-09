@@ -16,6 +16,9 @@ Gait-Datasets-TIFS20
 *.pth
 *.pt
 
+# Pickles
+*.pkl
+
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof
