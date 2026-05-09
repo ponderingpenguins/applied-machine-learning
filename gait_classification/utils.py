@@ -36,8 +36,12 @@ class TrainConfig:
         signals_dir: Directory for inertial signal files.
         y_path: Path to the file containing participant labels.
         CHANNEL_FILES: Dictionary mapping channel keys to their corresponding file names.
+        sampling_rate: Sampling rate of the signals in Hz.
+        cutoff_freq: Cutoff frequency for low-pass filtering in Hz.
+        filter_order: Order of the Butterworth filter.
     """
 
+    figures_dir: str = "./figures/"
     batch_size: int = 32
     num_epochs: int = 10
     learning_rate: float = 0.001
@@ -77,3 +81,6 @@ class TrainConfig:
             "GYRz": "train_gyr_z",
         }
     )
+    sampling_rate: float = 50.0  # Hz
+    cutoff_freq: float = 5.0  # Hz
+    filter_order: int = 4  # Order of the Butterworth filter

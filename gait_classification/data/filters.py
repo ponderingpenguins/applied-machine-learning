@@ -15,6 +15,7 @@ Kalman filtering:
 """
 
 import numpy as np
+from scipy.signal import butter, sosfiltfilt
 
 
 ## Filter class
@@ -82,9 +83,14 @@ class KalmanFilter(Filter):
 
     def apply(self, data):
         """Apply the Kalman filter to the data"""
+        # Handle both 1D and 2D input
+        if data.ndim == 1:
+            data = data.reshape(-1, 1)
+
         n_samples, n_features = data.shape
         self.estimated_state = np.zeros((n_samples, n_features))
-        self.estimated_covariance = np.zeros((n_samples, n_features))
+        self.estimated_covariance = np.zeros((n_samples, n_features, n_features))
+
         for i in range(n_samples):
             if i == 0:
                 # Initialize the state and covariance
@@ -93,22 +99,64 @@ class KalmanFilter(Filter):
             else:
                 # Prediction step
                 predicted_state = self.estimated_state[i - 1]
-                predicted_covariance = self.estimated_covariance[
-                    i - 1
-                ] + self.process_variance * np.eye(n_features)
+                predicted_covariance = self.estimated_covariance[i - 1] + self.process_variance * np.eye(n_features)
+
                 # Update step
-                kalman_gain = predicted_covariance / (
-                    predicted_covariance
-                    + self.measurement_variance * np.eye(n_features)
-                )
-                self.estimated_state[i] = predicted_state + kalman_gain @ (
-                    data[i] - predicted_state
-                )
-                self.estimated_covariance[i] = (
-                    np.eye(n_features) - kalman_gain
-                ) @ predicted_covariance
-        return self.estimated_state
+                innovation = data[i] - predicted_state
+                innovation_covariance = predicted_covariance + self.measurement_variance * np.eye(n_features)
+                # Kalman gain: K = P_pred / (P_pred + R)
+                kalman_gain = predicted_covariance @ np.linalg.inv(innovation_covariance)
+                # Update state
+                self.estimated_state[i] = predicted_state + kalman_gain @ innovation
+                # Update covariance
+                self.estimated_covariance[i] = (np.eye(n_features) - kalman_gain) @ predicted_covariance
+
+        # Return as 1D array if input was 1D
+        result = self.estimated_state
+        if result.shape[1] == 1:
+            result = result.squeeze()
+
+        return result
 
     def inverse(self, data):
         """The kalman filter is not invertible, so don't implement this method"""
         raise NotImplementedError("KalmanFilter does not implement the inverse method")
+
+
+class LowPassFFTFilter(FFTFilter):
+    """Low-pass filter using FFT"""
+
+    def __init__(self, cutoff_freq: float, fs: float):
+        super().__init__(
+            threshold=0.95
+        )  # Use the default threshold for feature selection
+        self.cutoff_freq = cutoff_freq
+        self.fs = fs
+
+    def apply(self, data):
+        """Apply the low-pass filter to the data using FFT"""
+        N = data.shape[0]
+        freqs = np.fft.rfftfreq(N, d=1.0 / self.fs)
+        fft_coeffs = np.fft.rfft(data, axis=0)
+        fft_coeffs[freqs > self.cutoff_freq] = 0
+        return np.fft.irfft(fft_coeffs, n=N, axis=0)
+
+
+class ButterworthLowPassFilter(Filter):
+    """Butterworth low-pass filter"""
+
+    def __init__(self, cutoff_freq: float, fs: float, order: int = 4):
+        self.cutoff_freq = cutoff_freq
+        self.fs = fs
+        self.order = order
+
+    def apply(self, data):
+        """Apply the Butterworth low-pass filter to the data"""
+        sos = butter(self.order, self.cutoff_freq / (0.5 * self.fs), output="sos")
+        return sosfiltfilt(sos, data, axis=0)
+
+    def inverse(self, data):
+        """The Butterworth filter is not invertible, so don't implement this method"""
+        raise NotImplementedError(
+            "ButterworthLowPassFilter does not implement the inverse method"
+        )

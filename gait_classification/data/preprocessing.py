@@ -3,62 +3,62 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from omegaconf import OmegaConf
 
-from scipy.signal import butter, sosfiltfilt
-
-def low_pass_filter(signal: np.ndarray, cutoff_freq: float, fs: float) -> np.ndarray:
-    """
-    Apply a low-pass filter to the input signal using FFT.
-
-    Parameters:
-    signal (np.ndarray): The input signal to be filtered.
-    cutoff_freq (float): The cutoff frequency of the low-pass filter.
-    fs (float): The sampling frequency of the signal.
-
-    Returns:
-    np.ndarray: The filtered signal.
-    """
-    N = signal.shape[0]
-    freqs = np.fft.rfftfreq(N, d=1.0 / fs)
-    fft_coeffs = np.fft.rfft(signal, axis=0)
-    fft_coeffs[freqs > cutoff_freq] = 0
-    return np.fft.irfft(fft_coeffs, n=N, axis=0)
-
-
-def butterworth_filter(signal: np.ndarray, cutoff_freq: float, fs: float, order: int = 4) -> np.ndarray:
-    """
-    Apply a Butterworth low-pass filter to the input signal.
-
-    Parameters:
-    signal (np.ndarray): The input signal to be filtered.
-    cutoff_freq (float): The cutoff frequency of the low-pass filter.
-    fs (float): The sampling frequency of the signal.
-    order (int): The order of the Butterworth filter.
-
-    Returns:
-    np.ndarray: The filtered signal.
-    """
-    sos = butter(order, cutoff_freq / (0.5 * fs), output='sos')
-    return sosfiltfilt(sos, signal, axis=0)
+from gait_classification.data.filters import (
+    ButterworthLowPassFilter,
+    KalmanFilter,
+    LowPassFFTFilter,
+)
+from gait_classification.data.gait_data import load_and_preprocess_data
+from gait_classification.utils import TrainConfig
 
 # testing purposes
 if __name__ == "__main__":
-    n = 201
-    t = np.linspace(0, 1, n)
-    x = 1 + (t < 0.5) - 0.25*t**2 + 0.05*np.random.standard_normal(n)
-    
-    filtered_signal_low_pass = low_pass_filter(x, cutoff_freq=5.0, fs=50.0)
-    
-    filter_coeffs = butter(4, 5.0 / (0.5 * 50.0), output='sos')
-    
-    filtered_signal_butter = sosfiltfilt(filter_coeffs, x)
-    
-    plt.plot(t, x, alpha=0.5, label='x(t)')
-    plt.plot(t, filtered_signal_low_pass, label='Filtered (Low-pass)')
-    plt.plot(t, filtered_signal_butter, label='Filtered (Butterworth)')
-    plt.legend(framealpha=1, shadow=True)
-    plt.grid(alpha=0.25)
-    plt.xlabel('t')
-    output_path = Path(__file__).resolve().parents[1] / "figures" / "preprocessing_demo.png"
+    cfg = OmegaConf.structured(TrainConfig)
+
+    lowpass_filter = LowPassFFTFilter(cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate)
+    basic_fft_filter = LowPassFFTFilter(
+        cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate
+    )
+    butter_filter = ButterworthLowPassFilter(
+        cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate, order=cfg.filter_order
+    )
+    kalman_filter = KalmanFilter(process_variance=1e-3, measurement_variance=1e-3)
+
+    # load sample signals from the dataset for demonstration
+    raw, y = load_and_preprocess_data(cfg, preprocess_functions=[])
+
+    # Create figure with grid of subplots
+    n_samples_to_show = 6
+    fig, axes = plt.subplots(3, 2, figsize=(14, 12))
+    axes = axes.flatten()
+
+    for sample_idx in range(min(n_samples_to_show, raw.shape[0])):
+        x = raw[sample_idx, :, 0]  # Take the sample and first channel
+        t = np.arange(len(x)) / cfg.sampling_rate  # Time vector based on sampling rate
+
+        filtered_signal_low_pass = lowpass_filter.apply(x)
+        filtered_signal_butter = butter_filter.apply(x)
+        filtered_signal_basic_fft = basic_fft_filter.apply(x)
+        filtered_signal_kalman = kalman_filter.apply(x)
+
+        ax = axes[sample_idx]
+        ax.plot(t, x, alpha=0.5, label="Original Signal", linewidth=1.5)
+        ax.plot(t, filtered_signal_low_pass, label="Low-pass FFT", linewidth=1)
+        ax.plot(t, filtered_signal_butter, label="Butterworth", linewidth=1)
+        ax.plot(t, filtered_signal_basic_fft, label="Basic FFT", linewidth=1)
+        ax.plot(t, filtered_signal_kalman, label="Kalman", linewidth=1)
+        ax.legend(framealpha=0.9, shadow=True, fontsize=8)
+        ax.grid(alpha=0.25)
+        ax.set_xlabel("t (s)", fontsize=9)
+        ax.set_ylabel("x(t)", fontsize=9)
+        ax.set_title(f"Sample {sample_idx} (Class: {y[sample_idx]})", fontsize=10)
+
+    plt.suptitle(
+        "Comparison of Filters on Multiple Samples", fontsize=12, fontweight="bold"
+    )
+    plt.tight_layout()
+    output_path = cfg.figures_dir + "preprocessing_demo.png"
     plt.savefig(output_path, dpi=120, bbox_inches="tight")
     plt.close()

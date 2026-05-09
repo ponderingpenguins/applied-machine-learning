@@ -56,7 +56,7 @@ def load_and_preprocess_data(
         raw = raw[:n_samples]
         y = y[:n_samples]
 
-    for func in preprocess_functions:
+    for func in tqdm(preprocess_functions, desc="Preprocessing data"):
         raw = func(raw)
 
     return raw, y
