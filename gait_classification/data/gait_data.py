@@ -138,6 +138,7 @@ def fit_scaler(
     """
     Fit a StandardScaler on training windows only.
     Args:
+        cfg: TrainConfig object.
         windows: Array of shape (N_windows, seq_len, 6).
         labels: Array of shape (N_windows,) with participant IDs.
         train_pids: Array of participant IDs in the training set.
@@ -149,7 +150,7 @@ def fit_scaler(
 
     train_windows_flat = train_windows.reshape(-1, 6)
 
-    scaler = StandardScaler()
+    scaler = StandardScaler()  # z-score normalization
     scaler.fit(train_windows_flat)
 
     return scaler

@@ -66,6 +66,7 @@ def fooberino(cfg: TrainConfig) -> None:
         len(test_pids),
     )
 
+    # z-score normalization using only training data statistics
     scaler = fit_scaler(windows, labels, train_pids)
     windows = apply_scaler(windows, scaler)
 
