@@ -13,6 +13,7 @@ Gait-Datasets-TIFS20
 *.zip
 
 # Torch model checkpoints
+checkpoints/
 *.pth
 *.pt
 

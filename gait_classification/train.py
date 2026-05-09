@@ -398,6 +398,8 @@ def fooberino(cfg: TrainConfig) -> None:
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
 
     best_val_loss = float("inf")
+    train_losses = []
+    val_losses = []
 
     logger.info("Starting training...")
     for epoch in tqdm(range(cfg.num_epochs), desc="Epochs"):
@@ -422,6 +424,9 @@ def fooberino(cfg: TrainConfig) -> None:
                 train=False,
             )
 
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+
         logger.info(
             "Epoch %d/%d  train_loss=%.4f  val_loss=%.4f",
             epoch + 1,
@@ -434,7 +439,15 @@ def fooberino(cfg: TrainConfig) -> None:
             best_val_loss = val_loss
             _save_checkpoint(model, optimizer, epoch, val_loss, cfg)
 
-    logger.info("Training complete. Evaluating on test set...")
+    logger.info("Training complete. Saving training history...")
+    import json
+    os.makedirs(cfg.checkpoint_dir, exist_ok=True)
+    history_path = os.path.join(cfg.checkpoint_dir, "training_history.json")
+    with open(history_path, "w") as f:
+        json.dump({"train_loss": train_losses, "val_loss": val_losses}, f)
+    logger.info("Training history saved to %s", history_path)
+
+    logger.info("Evaluating on test set...")
     model.eval()
 
     train_emb_by_pid = compute_embeddings(
