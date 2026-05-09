@@ -21,6 +21,9 @@ Evaluation:
     a. Compute FAR and FRR and plot the FAR-FRR curve and compute the EER (Equal Error Rate).
     b. (for later) Evaluate the model the same way as the paper "Deep Learning-Based Gait Recognition
 Using Smartphones in the Wild" does, by evaluating on the latest 10% of the data for each participant, and computing the accuracy of the model on that data.
+
+Notes:
+- online triplet mining based on: https://github.com/aktgpt/onlinetripletmining
 """
 
 import logging
@@ -31,20 +34,20 @@ import numpy as np
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
-from torch.utils.data import DataLoader
-from utils import ModelType, TrainConfig
+from torch.utils.data import DataLoader, WeightedRandomSampler
+from tqdm import tqdm
 
 from gait_classification.data.gait_data import (
-    GaitDataset,
+    GaitWindowDataset,
     apply_scaler,
     build_windowed_data,
     fit_scaler,
-    generate_triplets,
     load_and_preprocess_data,
     participant_split,
 )
 from gait_classification.models.lstm import LSTM
 from gait_classification.models.transformer import GaitTransformer
+from gait_classification.utils import ModelType, TrainConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,28 +57,109 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def mine_semihard_triplets(
+    embeddings: torch.Tensor, labels: torch.Tensor, margin: float
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
+    """Mine semi-hard triplets per-label from a batch of embeddings.
+
+    For each label class in the batch:
+    - Generate all anchor-positive pairs within that class
+    - For each pair, select a semi-hard negative from other classes where:
+      d(a,p) < d(a,n) < d(a,p) + margin
+    - Falls back to hardest negative if no semi-hard negative exists.
+    """
+    dist_mat = torch.cdist(embeddings, embeddings, p=2)
+    unique_labels = torch.unique(labels)
+    anchors, positives, negatives = [], [], []
+
+    for label in unique_labels:
+        pos_mask = labels == label
+        neg_mask = ~pos_mask
+        pos_indices = torch.where(pos_mask)[0]
+        neg_indices = torch.where(neg_mask)[0]
+
+        if len(pos_indices) < 2 or len(neg_indices) == 0:
+            continue
+
+        for i in range(len(pos_indices)):
+            for j in range(len(pos_indices)):
+                if i == j:
+                    continue
+                a_idx = pos_indices[i]
+                p_idx = pos_indices[j]
+                ap_dist = dist_mat[a_idx, p_idx]
+
+                neg_dists = dist_mat[a_idx, neg_indices]
+                semi_hard = (neg_dists > ap_dist) & (neg_dists < ap_dist + margin)
+
+                if semi_hard.any():
+                    n_idx = neg_indices[semi_hard][torch.argmin(neg_dists[semi_hard])]
+                else:
+                    n_idx = neg_indices[torch.argmin(neg_dists)]
+
+                anchors.append(a_idx.item())
+                positives.append(p_idx.item())
+                negatives.append(n_idx.item())
+
+    if not anchors:
+        return None
+
+    return (
+        torch.tensor(anchors, device=embeddings.device),
+        torch.tensor(positives, device=embeddings.device),
+        torch.tensor(negatives, device=embeddings.device),
+    )
+
+
+class OnlineTripletLoss(nn.Module):
+    """Online triplet loss with semi-hard negative mining."""
+
+    def __init__(self, margin: float):
+        super().__init__()
+        self.margin = margin
+        self.loss_fn = nn.TripletMarginLoss(margin=margin, p=2)
+
+    def forward(
+        self, embeddings: torch.Tensor, labels: torch.Tensor
+    ) -> tuple[torch.Tensor | None, int]:
+        """Compute triplet loss with online mining.
+
+        Returns:
+            (loss, num_triplets) where loss is None if no triplets found
+        """
+        triplet_indices = mine_semihard_triplets(embeddings, labels, self.margin)
+        if triplet_indices is None:
+            return None, 0
+
+        a, p, n = triplet_indices
+        loss = self.loss_fn(embeddings[a], embeddings[p], embeddings[n])
+        return loss, len(a)
+
+
 def _run_epoch(
     model: nn.Module,
     loader: DataLoader,
-    criterion: nn.TripletMarginLoss,
+    criterion: OnlineTripletLoss,
     optimizer=None,
     device: torch.device = None,
     train: bool = False,
 ) -> float:
-    """Run a single epoch (training or validation)."""
+    """Run a single epoch with online semi-hard triplet mining."""
     total_loss = 0.0
     n_batches = 0
+    total_batches = len(loader)
 
-    for anchor, positive, negative in loader:
-        anchor = anchor.to(device)
-        positive = positive.to(device)
-        negative = negative.to(device)
+    mode = "Train" if train else "Val"
+    pbar = tqdm(loader, desc=f"{mode} batches", leave=False, total=total_batches)
+    for windows, labels in pbar:
+        windows = windows.to(device)
+        labels = torch.tensor(labels, dtype=torch.long, device=device)
 
-        emb_a = model(anchor)
-        emb_p = model(positive)
-        emb_n = model(negative)
+        embeddings = model(windows)
+        loss, n_triplets = criterion(embeddings, labels)
 
-        loss = criterion(emb_a, emb_p, emb_n)
+        if loss is None:
+            continue
 
         if train:
             optimizer.zero_grad()
@@ -86,6 +170,10 @@ def _run_epoch(
         total_loss += loss.item()
         n_batches += 1
 
+        avg_loss = total_loss / n_batches
+        pbar.set_postfix({"loss": f"{avg_loss:.4f}"})
+
+    pbar.close()
     return total_loss / max(n_batches, 1)
 
 
@@ -262,24 +350,18 @@ def fooberino(cfg: TrainConfig) -> None:
         len(test_windows),
     )
 
-    rng = np.random.default_rng(cfg.seed)
+    train_ds = GaitWindowDataset(train_windows, train_labels)
+    val_ds = GaitWindowDataset(val_windows, val_labels)
 
-    logger.info("Generating triplets...")
-    train_triplets = generate_triplets(
-        train_labels, train_pids, n_neg_per_pair=5, rng=rng
+    class_counts = np.bincount(train_labels)
+    weights = 1.0 / class_counts[train_labels]
+    train_sampler = WeightedRandomSampler(
+        weights.tolist(), len(train_labels), replacement=True
     )
-    val_triplets = generate_triplets(val_labels, val_pids, n_neg_per_pair=5, rng=rng)
-    logger.info(
-        "Train triplets: %d, Val triplets: %d", len(train_triplets), len(val_triplets)
-    )
-
-    train_ds = GaitDataset(train_windows, train_labels, train_triplets)
-    val_ds = GaitDataset(val_windows, val_labels, val_triplets)
-
     train_loader = DataLoader(
         train_ds,
         batch_size=cfg.batch_size,
-        shuffle=True,
+        sampler=train_sampler,
         num_workers=0,
         pin_memory=True,
     )
@@ -312,22 +394,32 @@ def fooberino(cfg: TrainConfig) -> None:
     else:
         raise ValueError(f"Unknown model type: {cfg.model_type}")
 
-    criterion = nn.TripletMarginLoss(margin=cfg.triplet_margin, p=2)
+    criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
 
     best_val_loss = float("inf")
 
     logger.info("Starting training...")
-    for epoch in range(cfg.num_epochs):
+    for epoch in tqdm(range(cfg.num_epochs), desc="Epochs"):
         model.train()
         train_loss = _run_epoch(
-            model, train_loader, criterion, optimizer, device, train=True
+            model,
+            train_loader,
+            criterion,
+            optimizer,
+            device,
+            train=True,
         )
 
         model.eval()
         with torch.no_grad():
             val_loss = _run_epoch(
-                model, val_loader, criterion, None, device, train=False
+                model,
+                val_loader,
+                criterion,
+                None,
+                device,
+                train=False,
             )
 
         logger.info(

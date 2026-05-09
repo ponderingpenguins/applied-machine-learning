@@ -239,28 +239,22 @@ def generate_triplets(
     return triplets
 
 
-class GaitDataset(Dataset):
-    """Dataset for triplet learning on gait signals."""
+class GaitWindowDataset(Dataset):
+    """Dataset for online triplet mining on gait signals."""
 
-    def __init__(
-        self,
-        windows: np.ndarray,
-        labels: np.ndarray,
-        triplets: list[tuple[int, int, int]],
-    ):
+    def __init__(self, windows: np.ndarray, labels: np.ndarray):
         """
         Args:
             windows: Array of shape (N, seq_len, 6) with windowed signals.
             labels: Array of shape (N,) with participant IDs.
-            triplets: List of (anchor_idx, pos_idx, neg_idx) tuples.
         """
         self.windows = torch.tensor(windows, dtype=torch.float32)
         self.labels = labels
-        self.triplets = triplets
 
     def __len__(self) -> int:
-        return len(self.triplets)
+        return len(self.labels)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        a, p, n = self.triplets[idx]
-        return self.windows[a], self.windows[p], self.windows[n]
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+        return self.windows[idx], self.labels[idx]
+
+
