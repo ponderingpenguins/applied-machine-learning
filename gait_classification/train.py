@@ -31,8 +31,11 @@ from omegaconf import OmegaConf
 from utils import TrainConfig
 
 from gait_classification.data.gait_data import (
+    apply_scaler,
     build_windowed_data,
+    fit_scaler,
     load_and_preprocess_data,
+    participant_split,
 )
 
 logging.basicConfig(
@@ -54,6 +57,32 @@ def fooberino(cfg: TrainConfig) -> None:
 
     participants = np.unique(labels)
     logger.info("Total participants: %d", len(participants))
+
+    train_pids, val_pids, test_pids = participant_split(participants, cfg)
+    logger.info(
+        "Train: %d, Val: %d, Test: %d participants",
+        len(train_pids),
+        len(val_pids),
+        len(test_pids),
+    )
+
+    scaler = fit_scaler(windows, labels, train_pids)
+    windows = apply_scaler(windows, scaler)
+
+    train_mask = np.isin(labels, train_pids)
+    val_mask = np.isin(labels, val_pids)
+    test_mask = np.isin(labels, test_pids)
+
+    train_windows, train_labels = windows[train_mask], labels[train_mask]
+    val_windows, val_labels = windows[val_mask], labels[val_mask]
+    test_windows, test_labels = windows[test_mask], labels[test_mask]
+
+    logger.info(
+        "Train windows: %d, Val windows: %d, Test windows: %d",
+        len(train_windows),
+        len(val_windows),
+        len(test_windows),
+    )
 
 
 def main() -> None:

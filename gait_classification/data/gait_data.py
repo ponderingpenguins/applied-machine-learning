@@ -3,6 +3,7 @@ from curses import raw
 import numpy as np
 import pandas as pd
 from scipy.fft import rfft
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 from gait_classification.utils import TrainConfig
@@ -96,3 +97,75 @@ def build_windowed_data(
     labels = np.array(labels_list, dtype=int)
 
     return windows, labels
+
+
+def participant_split(
+    participants: np.ndarray, cfg: TrainConfig
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Deterministic participant-wise 70/15/15 split.
+    Args:
+        participants: Array of unique participant IDs.
+        cfg: TrainConfig containing seed and split ratios.
+    Returns:
+        Tuple of (train_pids, val_pids, test_pids).
+    """
+    rng = np.random.default_rng(cfg.seed)
+    shuffled = rng.permutation(participants)
+
+    n = len(shuffled)
+    train_cut = int(n * cfg.train_split)
+    val_cut = int(n * (cfg.train_split + cfg.val_split))
+
+    train_pids = shuffled[:train_cut]
+    val_pids = shuffled[train_cut:val_cut]
+    test_pids = shuffled[val_cut:]
+
+    # Sanity check to ensure splits are disjoint and cover all participants
+    assert len(set(train_pids) & set(val_pids)) == 0, "Train and Val splits overlap!"
+    assert len(set(train_pids) & set(test_pids)) == 0, "Train and Test splits overlap!"
+    assert len(set(val_pids) & set(test_pids)) == 0, "Val and Test splits overlap!"
+    assert len(train_pids) + len(val_pids) + len(test_pids) == n, (
+        "Splits do not cover all participants!"
+    )
+
+    return train_pids, val_pids, test_pids
+
+
+def fit_scaler(
+    windows: np.ndarray, labels: np.ndarray, train_pids: np.ndarray
+) -> StandardScaler:
+    """
+    Fit a StandardScaler on training windows only.
+    Args:
+        windows: Array of shape (N_windows, seq_len, 6).
+        labels: Array of shape (N_windows,) with participant IDs.
+        train_pids: Array of participant IDs in the training set.
+    Returns:
+        Fitted StandardScaler.
+    """
+    train_mask = np.isin(labels, train_pids)
+    train_windows = windows[train_mask]
+
+    train_windows_flat = train_windows.reshape(-1, 6)
+
+    scaler = StandardScaler()
+    scaler.fit(train_windows_flat)
+
+    return scaler
+
+
+def apply_scaler(windows: np.ndarray, scaler: StandardScaler) -> np.ndarray:
+    """
+    Apply a fitted StandardScaler to windows.
+    Args:
+        windows: Array of shape (N_windows, seq_len, 6).
+        scaler: Fitted StandardScaler.
+    Returns:
+        Scaled windows of the same shape.
+    """
+    n_windows, seq_len = windows.shape[:2]
+    windows_flat = windows.reshape(-1, 6)
+    windows_scaled_flat = scaler.transform(windows_flat)
+    windows_scaled = windows_scaled_flat.reshape(n_windows, seq_len, 6)
+    return windows_scaled
