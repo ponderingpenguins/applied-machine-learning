@@ -16,8 +16,7 @@
 % - Novelty
 % - Organised and reproducible github repo with commit history
 
-In previous sections, we have already described how we will be pre-processing the data, conducting cross-validation, and optimizing hyperparameters. 
+Our preprocessing plan is to start with the segmented windows, check for sensor artifacts and outliers, normalize each channel using training-data statistics, and then prepare either raw windows or engineered features depending on the model. For cross-validation, we will use subject-level splits so that data from the same person does not appear in both training and testing, which better measures generalization to new users. For optimization, we will tune the main hyperparameters of each model, such as learning rate, dropout, regularization strength, and model-specific architecture settings, using validation performance. To evaluate overfitting, we will compare training and validation performance and use regularization methods such as dropout, L2 regularization, and early stopping when needed. 
 
-For the evaluation of over/underfitting with regularization, we already mentioned that we will be using regularization techniques as well as early stopping to prevent overfitting. 
-
-In terms of novelty, we believe our project is novel as no previous work on the real world application of gait-based owner verification has been done. To this end, we aim to compress the model to be able to run on a smartphone. 
+\newpage
+We also see our novelty coming from the in the real-world setting of gait-based owner verification on phone sensor data, especially because we want the model to generalize to unseen people rather than only recognize users it has already seen. In addition, we aim to keep the model lightweight enough for possible smartphone deployment. The project should also satisfies the reproducibility requirements. We have maintained a structured GitHub repository from the start, used feature branches, written clear commit messages, and kept notes and code organized so the workflow can be followed and reproduced.

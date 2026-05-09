@@ -13,6 +13,7 @@ Method 2: Centroid visualisation (PCA + t-SNE)
   Tight, separated clusters explain the low EER.
 """
 
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -26,9 +27,12 @@ FFT_THRESHOLD = 0.95
 SAMPLING_RATE = 50  # Hz
 N_FFT_COEFFS = 500
 
-TRAIN_DIR = "../../Gait-Datasets-TIFS20/Dataset #1/train"
-SIGNALS_DIR = f"{TRAIN_DIR}/Inertial Signals"
-Y_PATH = f"{TRAIN_DIR}/y_train.txt"
+# Construct paths relative to this script's location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+TRAIN_DIR = os.path.join(SCRIPT_DIR, "../../Gait-Datasets-TIFS20/Dataset #1/train")
+FIGURES_DIR = os.path.join(SCRIPT_DIR, "../figures")
+SIGNALS_DIR = os.path.join(TRAIN_DIR, "Inertial Signals")
+Y_PATH = os.path.join(TRAIN_DIR, "y_train.txt")
 
 CHANNEL_FILES = {
     "ACCx": "train_acc_x",
@@ -144,9 +148,11 @@ def plot_f_ratio_spectrum(
 
     fig.suptitle(title, fontsize=13)
     plt.tight_layout()
-    plt.savefig("../figures/xai_f_ratio_spectrum.png", dpi=150)
+
+    output_path = os.path.join(FIGURES_DIR, "xai_f_ratio_spectrum.png")
+    plt.savefig(output_path, dpi=150)
     plt.show()
-    print("Saved ../figures/xai_f_ratio_spectrum.png")
+    print(f"Saved {output_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +182,11 @@ def plot_centroids_pca(centroids, known, title="PCA of participant centroids"):
     plt.colorbar(sc, ax=ax, label="Participant index")
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
-    plt.savefig("../figures/xai_centroids_pca.png", dpi=150)
+
+    output_path = os.path.join(FIGURES_DIR, "xai_centroids_pca.png")
+    plt.savefig(output_path, dpi=150)
     plt.show()
-    print("Saved ../figures/xai_centroids_pca.png")
+    print(f"Saved {output_path}")
 
 
 def plot_centroids_tsne(centroids, known, title="t-SNE of participant centroids"):
@@ -208,9 +216,11 @@ def plot_centroids_tsne(centroids, known, title="t-SNE of participant centroids"
     plt.colorbar(sc, ax=ax, label="Participant index")
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
-    plt.savefig("../figures/xai_centroids_tsne.png", dpi=150)
+
+    output_path = os.path.join(FIGURES_DIR, "xai_centroids_tsne.png")
+    plt.savefig(output_path, dpi=150)
     plt.show()
-    print("Saved ../figures/xai_centroids_tsne.png")
+    print(f"Saved {output_path}")
 
 
 # ---------------------------------------------------------------------------

@@ -11,20 +11,20 @@
 %     \item \textbf{Required:} x 1 dimensionality reduced plot, x 2 other plots.
 % \end{itemize}
 
-The dataset we found on GitHub contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time, where Figure \ref{fig:axes} shows the sensor axes. Figure \ref{fig:raw_signals} shows an example signal. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. As an attempt to filter out the high-frequency noise, we applied a low-pass filter to the raw signals, as shown in Figure \ref{fig:smoothed_signals}. Both raw and smoothed signals show a periodic pattern that is expected from the previous domain knowledge of the walking motion. Hence, we will extract features from frequency domain.
+The dataset we found on GitHub is the one released with the paper by Zou et~al.~\cite{zou2020gaitsmartphones} and its source code repository~\cite{zou2020gaitsmartphonesrepo}. It contains 3-axis gyroscope readings (GYR) and 3-axis accelerometer readings (ACC) over time, where Figure \ref{fig:axes} shows the sensor axes. Figure \ref{fig:raw_signals} shows an example signal. This gives us the channels ACC$_x$, ACC$_y$, ACC$_z$, GYR$_x$, GYR$_y$, and GYR$_z$, each sampled at 50 Hz. As an attempt to filter out the high-frequency noise, we applied a low-pass filter to the raw signals, as shown in Figure \ref{fig:smoothed_signals}. Both raw and smoothed signals show a periodic pattern that is expected from the previous domain knowledge of the walking motion. Hence, we will extract features from frequency domain. Since we frame the task as open-set verification, class balance during training can be controlled by balancing genuine and impostor comparisons within each fold.
 
 Other possible features we consider are the absolute acceleration, which is computed as $\sqrt{ACC_x^2 + ACC_y^2 + ACC_z^2}$, and absolute angular velocity, which is computed as $\sqrt{GYR_x^2 + GYR_y^2 + GYR_z^2}$. These features are expected to be informative because they capture the overall magnitude of acceleration and angular velocity regardless of direction, which can be indicative of the intensity and dynamics of the walking motion. 
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.3\textwidth]{figures/axes.png}
+    \includegraphics[width=0.25\textwidth]{figures/axes.png}
     \caption{Sensor axes for accelerometer and gyroscope readings \cite{mathworks2014gyroscope}}
     \label{fig:axes}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \begin{subfigure}[t]{0.48\textwidth}
+    \begin{subfigure}[t]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/raw_signals.png}
         \caption{Raw Sensor Signals Over Time}
@@ -39,8 +39,6 @@ Other possible features we consider are the absolute acceleration, which is comp
     \caption{Time-series sensor signal examples}
     \label{fig:signal_examples}
 \end{figure}
-
-Since the task we are framing is a one-vs-rest verification problem, the class balance can be controlled during training by pairing each positive example with a negative comparison example.
 
 % There is naturally correlation in the data because these channels represent different axes in the same physical space, but this is not necessarily a limitation. Instead, the channels are complementary because together they capture spatial information about the motion of a step and its effect on acceleration and rotation. This generally supports our original expectations rather than contradicting them.
 
@@ -64,4 +62,11 @@ As a dimensionality reduction attempt, we applied t-SNE, with 118 classes (one f
     \label{fig:t-sne}
 \end{figure}
 
-There is no missing data or outliers in the dataset.
+There is no missing data in the dataset. Regarding outliers, we observe that the sensor readings fall outside typical ranges, particularly in the gyroscope channels. However, we note that outliers in gait data may represent distinctive behavioral patterns that are part of an individual's biometric fingerprint rather than measurement errors. As a behavioral biometric, gait naturally exhibits individual variation, including asymmetries and characteristic motion anomalies. We will explore the impact of outlier removal during model development but expect to retain most outliers in our final feature set, as they may be diagnostic of person-specific gait characteristics.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/outlier_precentage.png}
+    \caption{Percentage of outliers in the different channels, calculated as the greater than 1.5 IQR from the mean of each channel.}
+    \label{fig:outlier}
+\end{figure}

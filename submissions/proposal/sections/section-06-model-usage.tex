@@ -11,20 +11,6 @@
 %     \item \textbf{Required:} Something that happens before and something that happens after your model.
 % \end{itemize}
 
-Our model could be used for:
-\begin{itemize}
-    \item theft detection;
-    \item suspicious activity detection;
-    \item purchase confirmation based on recent motion behavior; and
-    \item other lightweight security checks that require confirmation of identity.
-\end{itemize}
+As hypothesised in the introduction and based on preliminary domain knowledge, the model could be used for theft and suspicious activity detection, purchase confirmation based on recent motion behaviour, and other lightweight security checks requiring identity confirmation. While these are all practical applications, they are feasible and realistic due to the prospective system being relatively small, capable of running on a device and having access to live motion data. The input of acceleration and rotation data and the output of an onset/offset verification have a wide range of applications, and the model itself will likely be part of a larger onboard security system. The great thing is that anyone with a smartphone, especially those who want an additional passive layer of security, can use the model. Since our initial goal is to create a working service with just an API endpoint, this can be used for less live and onboard security, similar to software such as FindMy and Life360, which perform passive and possibly interval checks. We don't want to livestream biometric data, so ideally we want edge deployment.
 
-\textbf{Why:} the system is relatively small, can run on-device, and has access to live motion data.
-
-\textbf{Who could use it:} anyone with a smartphone, especially users who want an extra passive layer of security.
-
-A user could download the app or access an API-based web app. If we can make the model small enough, we may be able to deploy it directly in the browser or as a lightweight local download. There would first be a short enrollment period where the user walks for a few minutes to create an identification embedding. After that, live data would be streamed in, interpolated and resampled to handle jitter, and then compared through cosine similarity or another comparison method against the known owner embedding.
-
-Most of the time the system would remain idle. If it makes a prediction that suggests a possible threat, the app could trigger an alert, message, or notification on another device.
-
-The final output is essentially a yes/no decision, so the user-facing result would likely be a notification on another device. To support that, we would need SMS, email, bot-based messaging, or a server that can receive the signal and send a ping to another device.
+In order for the model to function, there would first be a short enrolment period during which the user would walk for a few minutes in order to create an identification embedding or other enrolment, such as a centroid of features. After that, live data would be streamed in windows based on step timing, as described in the original paper. This data would be interpolated and resampled to handle jitter, and then compared against the known owner embedding using cosine similarity or another comparison method. Most of the time, the system would remain idle after the model. If it detects a potential threat, the app could trigger an alert, message or notification on another device. The final output is essentially a yes/no decision, so the user-facing result would probably be a notification on another device. In order to support this, we would require SMS, email, bot-based messaging or a server that can receive the signal and send a ping to another device. This could act as theft detection for children with phones, with parents receiving notifications when their child gives the device to an untrusted adult or it is stolen.

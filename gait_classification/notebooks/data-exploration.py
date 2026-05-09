@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
+from scipy.signal import butter, sosfiltfilt
+
 BASE = "Gait-Datasets-TIFS20/Dataset #1/train/Inertial Signals"
 
 def load(name):
@@ -41,7 +43,7 @@ plt.xlabel("Time (s)")
 plt.ylabel("Angular Velocity (deg/s)")
 plt.legend()
 plt.tight_layout()
-plt.savefig("src/gait_classification/figures/raw_signals.png")
+plt.savefig("gait_classification/figures/raw_signals.png")
 
 
 # Smoothing via FFT low-pass filter
@@ -52,6 +54,21 @@ def low_pass_filter(signal, cutoff_freq, fs):
     fft_coeffs[freqs > cutoff_freq] = 0
     return np.fft.irfft(fft_coeffs, n=N, axis=0)
 
+def butterworth_filter(signal: np.ndarray, cutoff_freq: float, fs: float, order: int = 4) -> np.ndarray:
+    """
+    Apply a Butterworth low-pass filter to the input signal.
+
+    Parameters:
+    signal (np.ndarray): The input signal to be filtered.
+    cutoff_freq (float): The cutoff frequency of the low-pass filter.
+    fs (float): The sampling frequency of the signal.
+    order (int): The order of the Butterworth filter.
+
+    Returns:
+    np.ndarray: The filtered signal.
+    """
+    sos = butter(order, cutoff_freq / (0.5 * fs), output='sos')
+    return sosfiltfilt(sos, signal, axis=0)
 
 acc = np.stack(
     [ax_[sample_index], ay_[sample_index], az_[sample_index]], axis=1
@@ -65,6 +82,9 @@ N = acc.shape[0]
 cutoff_freq = 5.0  # Hz
 acc_smooth = low_pass_filter(acc, cutoff_freq, fs)
 gyr_smooth = low_pass_filter(gyr, cutoff_freq, fs)
+
+acc_butterworth = butterworth_filter(acc, cutoff_freq, fs)
+gyr_butterworth = butterworth_filter(gyr, cutoff_freq, fs)
 
 # visualize smoothed data
 plt.figure(figsize=(12, 6))
@@ -85,4 +105,26 @@ plt.xlabel("Time (s)")
 plt.ylabel("Angular Velocity (rad/s)")
 plt.legend()
 plt.tight_layout()
-plt.savefig("src/gait_classification/figures/smoothed_signals.png")
+plt.savefig("gait_classification/figures/smoothed_signals.png")
+
+# visualize smoothed data
+plt.figure(figsize=(12, 6))
+plt.subplot(2, 1, 1)
+plt.plot(t, acc_butterworth[:, 0], label="acc_x")
+plt.plot(t, acc_butterworth[:, 1], label="acc_y")
+plt.plot(t, acc_butterworth[:, 2], label="acc_z")
+plt.title("Butterworth Filtered Accelerometer")
+plt.xlabel("Time (s)")
+plt.ylabel("Acceleration (m/s^2)")
+plt.legend()
+plt.subplot(2, 1, 2)
+plt.plot(t, gyr_smooth[:, 0], label="gyr_x")
+plt.plot(t, gyr_smooth[:, 1], label="gyr_y")
+plt.plot(t, gyr_smooth[:, 2], label="gyr_z")
+plt.title("Smoothed Gyroscope")
+plt.xlabel("Time (s)")
+plt.ylabel("Angular Velocity (rad/s)")
+plt.legend()
+plt.tight_layout()
+plt.savefig("gait_classification/figures/butterworth_signals.png")
+plt.close()
