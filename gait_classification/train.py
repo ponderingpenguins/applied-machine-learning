@@ -28,12 +28,15 @@ import sys
 
 import numpy as np
 from omegaconf import OmegaConf
+from torch.utils.data import DataLoader
 from utils import TrainConfig
 
 from gait_classification.data.gait_data import (
+    GaitDataset,
     apply_scaler,
     build_windowed_data,
     fit_scaler,
+    generate_triplets,
     load_and_preprocess_data,
     participant_split,
 )
@@ -83,6 +86,31 @@ def fooberino(cfg: TrainConfig) -> None:
         len(train_windows),
         len(val_windows),
         len(test_windows),
+    )
+
+    rng = np.random.default_rng(cfg.seed)
+
+    logger.info("Generating triplets...")
+    train_triplets = generate_triplets(
+        train_labels, train_pids, n_neg_per_pair=5, rng=rng
+    )
+    val_triplets = generate_triplets(val_labels, val_pids, n_neg_per_pair=5, rng=rng)
+    logger.info(
+        "Train triplets: %d, Val triplets: %d", len(train_triplets), len(val_triplets)
+    )
+
+    train_ds = GaitDataset(train_windows, train_labels, train_triplets)
+    val_ds = GaitDataset(val_windows, val_labels, val_triplets)
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=0, pin_memory=True
     )
 
 

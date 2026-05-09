@@ -1,10 +1,12 @@
 import pickle
-from curses import raw
+from typing import Optional
 
 import numpy as np
 import pandas as pd
+import torch
 from scipy.fft import rfft
 from sklearn.preprocessing import StandardScaler
+from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from gait_classification.utils import TrainConfig
@@ -175,3 +177,90 @@ def apply_scaler(windows: np.ndarray, scaler: StandardScaler) -> np.ndarray:
     windows_scaled_flat = scaler.transform(windows_flat)
     windows_scaled = windows_scaled_flat.reshape(n_windows, seq_len, 6)
     return windows_scaled
+
+
+def generate_triplets(
+    labels: np.ndarray,
+    pids: np.ndarray,
+    n_neg_per_pair: int = 5,
+    rng: Optional[np.random.Generator] = None,
+) -> list[tuple[int, int, int]]:
+    """
+    Generate offline triplets for metric learning.
+    For each participant, sample random anchor-positive pairs and negatives from other participants.
+    Args:
+        labels: Array of window participant IDs.
+        pids: Array of participant IDs to consider.
+        n_neg_per_pair: Number of negatives to sample per anchor-positive pair.
+        rng: Random number generator.
+    Returns:
+        List of (anchor_idx, pos_idx, neg_idx) tuples.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    idx_by_pid = {}
+    for pid in pids:
+        idx_by_pid[pid] = np.where(labels == pid)[0].tolist()
+
+    triplets = []
+
+    for pid in tqdm(pids, desc="Generating triplets"):
+        pos_indices = idx_by_pid[pid]
+        if len(pos_indices) < 2:
+            continue
+
+        neg_pids = [p for p in pids if p != pid]
+        if not neg_pids:
+            continue
+
+        neg_indices = []
+        for neg_pid in neg_pids:
+            neg_indices.extend(idx_by_pid[neg_pid])
+
+        n_samples_per_anchor = min(5, len(pos_indices) // 2 + 1)
+
+        for anchor_idx in tqdm(pos_indices, desc=f"Processing PID {pid}", leave=False):
+            pos_candidates = [idx for idx in pos_indices if idx != anchor_idx]
+            if not pos_candidates:
+                continue
+
+            sampled_pos = rng.choice(
+                pos_candidates,
+                size=min(n_samples_per_anchor, len(pos_candidates)),
+                replace=False,
+            )
+
+            for pos_idx in sampled_pos:
+                for _ in range(n_neg_per_pair):
+                    neg_idx = rng.choice(neg_indices)
+                    triplets.append((anchor_idx, pos_idx, neg_idx))
+
+    return triplets
+
+
+class GaitDataset(Dataset):
+    """Dataset for triplet learning on gait signals."""
+
+    def __init__(
+        self,
+        windows: np.ndarray,
+        labels: np.ndarray,
+        triplets: list[tuple[int, int, int]],
+    ):
+        """
+        Args:
+            windows: Array of shape (N, seq_len, 6) with windowed signals.
+            labels: Array of shape (N,) with participant IDs.
+            triplets: List of (anchor_idx, pos_idx, neg_idx) tuples.
+        """
+        self.windows = torch.tensor(windows, dtype=torch.float32)
+        self.labels = labels
+        self.triplets = triplets
+
+    def __len__(self) -> int:
+        return len(self.triplets)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        a, p, n = self.triplets[idx]
+        return self.windows[a], self.windows[p], self.windows[n]
