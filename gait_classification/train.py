@@ -81,12 +81,13 @@ def mine_semihard_triplets(
         if len(pos_indices) < 2 or len(neg_indices) == 0:
             continue
 
-        for i in range(len(pos_indices)):
-            for j in range(len(pos_indices)):
-                if i == j:
+        pos_list = pos_indices.tolist()
+        neg_list = neg_indices.tolist()
+
+        for a_idx in pos_list:
+            for p_idx in pos_list:
+                if a_idx == p_idx:
                     continue
-                a_idx = pos_indices[i]
-                p_idx = pos_indices[j]
                 ap_dist = dist_mat[a_idx, p_idx]
 
                 neg_dists = dist_mat[a_idx, neg_indices]
@@ -97,9 +98,9 @@ def mine_semihard_triplets(
                 else:
                     n_idx = neg_indices[torch.argmin(neg_dists)]
 
-                anchors.append(a_idx.item())
-                positives.append(p_idx.item())
-                negatives.append(n_idx.item())
+                anchors.append(a_idx)
+                positives.append(p_idx)
+                negatives.append(n_idx)
 
     if not anchors:
         return None
@@ -441,6 +442,7 @@ def fooberino(cfg: TrainConfig) -> None:
 
     logger.info("Training complete. Saving training history...")
     import json
+
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     history_path = os.path.join(cfg.checkpoint_dir, "training_history.json")
     with open(history_path, "w") as f:

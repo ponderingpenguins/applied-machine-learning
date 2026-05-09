@@ -7,7 +7,6 @@ python plot_training_curves.py --checkpoint-dir checkpoints --output figures/tra
 
 import json
 import os
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
