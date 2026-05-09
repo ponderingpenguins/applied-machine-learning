@@ -26,8 +26,14 @@ Using Smartphones in the Wild" does, by evaluating on the latest 10% of the data
 import logging
 import sys
 
+import numpy as np
 from omegaconf import OmegaConf
 from utils import TrainConfig
+
+from gait_classification.data.gait_data import (
+    build_windowed_data,
+    load_and_preprocess_data,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +46,14 @@ logger = logging.getLogger(__name__)
 def fooberino(cfg: TrainConfig) -> None:
     """train the model"""
     logger.info("Training with config: %s", cfg)
+
+    logger.info("Loading and windowing data...")
+    raw, y = load_and_preprocess_data(cfg, preprocess_functions=[])
+    windows, labels = build_windowed_data(cfg, raw, y)
+    logger.info("Total windows: %d", len(windows))
+
+    participants = np.unique(labels)
+    logger.info("Total participants: %d", len(participants))
 
 
 def main() -> None:
