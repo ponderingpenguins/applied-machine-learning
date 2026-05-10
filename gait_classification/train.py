@@ -1,29 +1,15 @@
 """
 The training logic for gait classification (open set classification using triplet loss).
 
-Data pipeline:
-1. Load the dataset (gyro and accelerometer data)
-2. Split the data participant wise into train/val/test sets, of size 70/15/15.
-3. preprocess it (e.g., normalization, windowing).
-4. Create triplets (anchor, positive, negative) for training.
-
-Training loop:
-5. For each epoch:
-    a. For each batch of triplets:
-        i. Forward pass through the model to get embeddings.
-        ii. Compute the triplet loss.
-        iii. Backpropagate and update model parameters.
-6. Save the trained model.
-- for later: Use k-fold cross-validation to evaluate the model's performance and robustness on the validation set, and select the best model based on validation performance.
-
-Evaluation:
-7. Evaluate the trained model on the test set.
-    a. Compute FAR and FRR and plot the FAR-FRR curve and compute the EER (Equal Error Rate).
-    b. (for later) Evaluate the model the same way as the paper "Deep Learning-Based Gait Recognition
-Using Smartphones in the Wild" does, by evaluating on the latest 10% of the data for each participant, and computing the accuracy of the model on that data.
-
 Notes:
 - online triplet mining based on: https://github.com/aktgpt/onlinetripletmining
+- Todo: evaluate the model the same way as in the paper that we are comparing to
+
+Transformer training example:
+python train.py max_samples=500 batch_size=128 model_type=transformer 'preprocess_filters=[]'
+
+LSTM training example:
+python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filters=[]'
 """
 
 import logging
@@ -37,6 +23,7 @@ from omegaconf import OmegaConf
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
+from gait_classification.data.filters import construct_filters
 from gait_classification.data.gait_data import (
     GaitWindowDataset,
     apply_scaler,
@@ -45,9 +32,10 @@ from gait_classification.data.gait_data import (
     load_and_preprocess_data,
     participant_split,
 )
-from gait_classification.models.lstm import LSTM
-from gait_classification.models.transformer import GaitTransformer
-from gait_classification.utils import ModelType, TrainConfig
+from gait_classification.eval import compute_far_frr_eer
+from gait_classification.models.models import construct_model
+from gait_classification.triplet_loss import OnlineTripletLoss
+from gait_classification.utils import TrainConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,86 +43,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-
-
-def mine_semihard_triplets(
-    embeddings: torch.Tensor, labels: torch.Tensor, margin: float
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
-    """Mine semi-hard triplets per-label from a batch of embeddings.
-
-    For each label class in the batch:
-    - Generate all anchor-positive pairs within that class
-    - For each pair, select a semi-hard negative from other classes where:
-      d(a,p) < d(a,n) < d(a,p) + margin
-    - Falls back to hardest negative if no semi-hard negative exists.
-    """
-    dist_mat = torch.cdist(embeddings, embeddings, p=2)
-    unique_labels = torch.unique(labels)
-    anchors, positives, negatives = [], [], []
-
-    for label in unique_labels:
-        pos_mask = labels == label
-        neg_mask = ~pos_mask
-        pos_indices = torch.where(pos_mask)[0]
-        neg_indices = torch.where(neg_mask)[0]
-
-        if len(pos_indices) < 2 or len(neg_indices) == 0:
-            continue
-
-        pos_list = pos_indices.tolist()
-        neg_list = neg_indices.tolist()
-
-        for a_idx in pos_list:
-            for p_idx in pos_list:
-                if a_idx == p_idx:
-                    continue
-                ap_dist = dist_mat[a_idx, p_idx]
-
-                neg_dists = dist_mat[a_idx, neg_indices]
-                semi_hard = (neg_dists > ap_dist) & (neg_dists < ap_dist + margin)
-
-                if semi_hard.any():
-                    n_idx = neg_indices[semi_hard][torch.argmin(neg_dists[semi_hard])]
-                else:
-                    n_idx = neg_indices[torch.argmin(neg_dists)]
-
-                anchors.append(a_idx)
-                positives.append(p_idx)
-                negatives.append(n_idx)
-
-    if not anchors:
-        return None
-
-    return (
-        torch.tensor(anchors, device=embeddings.device),
-        torch.tensor(positives, device=embeddings.device),
-        torch.tensor(negatives, device=embeddings.device),
-    )
-
-
-class OnlineTripletLoss(nn.Module):
-    """Online triplet loss with semi-hard negative mining."""
-
-    def __init__(self, margin: float):
-        super().__init__()
-        self.margin = margin
-        self.loss_fn = nn.TripletMarginLoss(margin=margin, p=2)
-
-    def forward(
-        self, embeddings: torch.Tensor, labels: torch.Tensor
-    ) -> tuple[torch.Tensor | None, int]:
-        """Compute triplet loss with online mining.
-
-        Returns:
-            (loss, num_triplets) where loss is None if no triplets found
-        """
-        triplet_indices = mine_semihard_triplets(embeddings, labels, self.margin)
-        if triplet_indices is None:
-            return None, 0
-
-        a, p, n = triplet_indices
-        loss = self.loss_fn(embeddings[a], embeddings[p], embeddings[n])
-        return loss, len(a)
 
 
 def _run_epoch(
@@ -178,36 +86,6 @@ def _run_epoch(
     return total_loss / max(n_batches, 1)
 
 
-def _save_checkpoint(
-    model: nn.Module,
-    optimizer: torch.optim.Optimizer,
-    epoch: int,
-    val_loss: float,
-    cfg: TrainConfig,
-) -> None:
-    """Save a model checkpoint."""
-    os.makedirs(cfg.checkpoint_dir, exist_ok=True)
-    path = os.path.join(cfg.checkpoint_dir, "best_model.pt")
-    torch.save(
-        {
-            "epoch": epoch,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "val_loss": val_loss,
-            "model_type": cfg.model_type,
-            "embedding_size": cfg.embedding_size,
-            "input_size": 6,
-            "hidden_size": 128,
-            "num_layers": 2,
-            "d_model": 64,
-            "nhead": 4,
-            "dim_feedforward": 256,
-        },
-        path,
-    )
-    logger.info("Checkpoint saved to %s (val_loss=%.4f)", path, val_loss)
-
-
 def compute_embeddings(
     model: nn.Module,
     windows: np.ndarray,
@@ -239,85 +117,14 @@ def compute_embeddings(
     return embeddings_by_pid
 
 
-def compute_far_frr_eer(
-    train_emb_by_pid: dict[int, np.ndarray],
-    test_emb_by_pid: dict[int, np.ndarray],
-    test_labels: np.ndarray,
-    known_pids: np.ndarray,
-) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Compute FAR, FRR, and EER using centroid-based distance.
-    Mirrors the notebook's evaluation logic.
-    """
-    embedding_size = next(iter(train_emb_by_pid.values())).shape[1]
-    centroids = np.zeros((len(known_pids), embedding_size), dtype=np.float32)
-
-    for i, pid in enumerate(known_pids):
-        if pid in train_emb_by_pid:
-            centroids[i] = train_emb_by_pid[pid].mean(axis=0)
-        else:
-            centroids[i] = np.zeros(embedding_size)
-
-    distances_known = []
-    distances_unknown = []
-
-    for pid in known_pids:
-        if pid not in test_emb_by_pid:
-            continue
-        embeddings = test_emb_by_pid[pid]
-        pid_idx = np.where(known_pids == pid)[0][0]
-        centroid = centroids[pid_idx]
-
-        dists = np.linalg.norm(embeddings - centroid, axis=1)
-        distances_known.extend(dists.tolist())
-
-    all_unknown_pids = [p for p in test_emb_by_pid.keys() if p not in known_pids]
-    for pid in all_unknown_pids:
-        embeddings = test_emb_by_pid[pid]
-        min_dists = np.min(
-            np.linalg.norm(embeddings[:, None, :] - centroids[None, :, :], axis=2),
-            axis=1,
-        )
-        distances_unknown.extend(min_dists.tolist())
-
-    distances_known = np.array(distances_known)
-    distances_unknown = np.array(distances_unknown)
-
-    thresholds = np.linspace(
-        0, np.max(np.concatenate([distances_known, distances_unknown])), 100
-    )
-    fars = []
-    frrs = []
-
-    for threshold in thresholds:
-        far = (
-            np.sum(distances_unknown < threshold) / len(distances_unknown)
-            if len(distances_unknown) > 0
-            else 0
-        )
-        frr = (
-            np.sum(distances_known > threshold) / len(distances_known)
-            if len(distances_known) > 0
-            else 0
-        )
-        fars.append(far)
-        frrs.append(frr)
-
-    fars = np.array(fars)
-    frrs = np.array(frrs)
-
-    eer_idx = np.argmin(np.abs(fars - frrs))
-    eer = (fars[eer_idx] + frrs[eer_idx]) / 2
-
-    return eer, thresholds, fars, frrs
-
-
 def fooberino(cfg: TrainConfig) -> None:
     """train the model"""
     logger.info("Training with config: %s", cfg)
 
     logger.info("Loading and windowing data...")
-    raw, y = load_and_preprocess_data(cfg, preprocess_functions=[])
+
+    preprocess_functions = construct_filters(cfg)
+    raw, y = load_and_preprocess_data(cfg, preprocess_functions=preprocess_functions)
     windows, labels = build_windowed_data(cfg, raw, y)
     logger.info("Total windows: %d", len(windows))
 
@@ -374,26 +181,7 @@ def fooberino(cfg: TrainConfig) -> None:
     device = torch.device("mps" if torch.backends.mps.is_available() else device)
     logger.info("Using device: %s", device)
 
-    if cfg.model_type == ModelType.LSTM or cfg.model_type == "lstm":
-        logger.info("Using LSTM model")
-        model = LSTM(
-            input_size=6,
-            hidden_size=128,
-            num_layers=2,
-            embedding_size=cfg.embedding_size,
-        ).to(device)
-    elif cfg.model_type == ModelType.TRANSFORMER or cfg.model_type == "transformer":
-        logger.info("Using Transformer model")
-        model = GaitTransformer(
-            input_size=6,
-            d_model=64,
-            nhead=4,
-            num_layers=2,
-            dim_feedforward=256,
-            embedding_size=cfg.embedding_size,
-        ).to(device)
-    else:
-        raise ValueError(f"Unknown model type: {cfg.model_type}")
+    model = construct_model(cfg, device)
 
     criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
@@ -438,7 +226,7 @@ def fooberino(cfg: TrainConfig) -> None:
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            _save_checkpoint(model, optimizer, epoch, val_loss, cfg)
+            model.save_a_checkpoint(optimizer, epoch, val_loss, cfg)
 
     logger.info("Training complete. Saving training history...")
     import json

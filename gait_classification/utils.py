@@ -53,6 +53,10 @@ class TrainConfig:
     # Would be nice to use the elbow method.
     n_folds: int = 5
 
+    preprocess_filters: list[str] = field(
+        default_factory=lambda: ["butterworth_lowpass"]
+    )  # List of filters to apply during preprocessing. Options: "butterworth_lowpass", "kalman", "fft_lowpass", "none"
+
     seq_len: int = 128
     window_stride: int = 128
     embedding_size: int = 64

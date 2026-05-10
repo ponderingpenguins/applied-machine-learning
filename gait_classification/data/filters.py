@@ -17,6 +17,8 @@ Kalman filtering:
 import numpy as np
 from scipy.signal import butter, sosfiltfilt
 
+from gait_classification.utils import TrainConfig
+
 
 ## Filter class
 class Filter:
@@ -29,6 +31,10 @@ class Filter:
     def inverse(self, data):
         """Apply the inverse of the filter to the data"""
         raise NotImplementedError("Filter subclasses must implement the inverse method")
+
+    def __call__(self, data):
+        """Apply the filter to the data when the object is called"""
+        return self.apply(data)
 
 
 # FFT filter
@@ -99,17 +105,26 @@ class KalmanFilter(Filter):
             else:
                 # Prediction step
                 predicted_state = self.estimated_state[i - 1]
-                predicted_covariance = self.estimated_covariance[i - 1] + self.process_variance * np.eye(n_features)
+                predicted_covariance = self.estimated_covariance[
+                    i - 1
+                ] + self.process_variance * np.eye(n_features)
 
                 # Update step
                 innovation = data[i] - predicted_state
-                innovation_covariance = predicted_covariance + self.measurement_variance * np.eye(n_features)
+                innovation_covariance = (
+                    predicted_covariance
+                    + self.measurement_variance * np.eye(n_features)
+                )
                 # Kalman gain: K = P_pred / (P_pred + R)
-                kalman_gain = predicted_covariance @ np.linalg.inv(innovation_covariance)
+                kalman_gain = predicted_covariance @ np.linalg.inv(
+                    innovation_covariance
+                )
                 # Update state
                 self.estimated_state[i] = predicted_state + kalman_gain @ innovation
                 # Update covariance
-                self.estimated_covariance[i] = (np.eye(n_features) - kalman_gain) @ predicted_covariance
+                self.estimated_covariance[i] = (
+                    np.eye(n_features) - kalman_gain
+                ) @ predicted_covariance
 
         # Return as 1D array if input was 1D
         result = self.estimated_state
@@ -160,3 +175,28 @@ class ButterworthLowPassFilter(Filter):
         raise NotImplementedError(
             "ButterworthLowPassFilter does not implement the inverse method"
         )
+
+
+def construct_filters(cfg: TrainConfig) -> list[Filter]:
+    """Construct filter objects based on the configuration."""
+    filters = []
+    for filter_name in cfg.preprocess_filters:
+        if filter_name == "butterworth_lowpass":
+            butterworth_filter = ButterworthLowPassFilter(
+                cutoff_freq=cfg.cutoff_freq,
+                fs=cfg.sampling_rate,
+                order=cfg.filter_order,
+            )
+            filters.append(butterworth_filter)
+        elif filter_name == "kalman":
+            kalman_filter = KalmanFilter(
+                process_variance=1e-5, measurement_variance=1e-2
+            )
+            filters.append(kalman_filter)
+        elif filter_name == "fft_lowpass":
+            fft_filter = LowPassFFTFilter(
+                cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate
+            )
+            filters.append(fft_filter)
+
+    return filters
