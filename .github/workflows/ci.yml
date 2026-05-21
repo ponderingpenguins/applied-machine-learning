@@ -29,10 +29,10 @@ jobs:
         run: uv sync --group dev
 
       - name: Run flake8
-        run: uv run flake8 src tests
+        run: uv run flake8 gait_classification tests
 
       - name: Run black (check mode)
-        run: uv run black --check src tests
+        run: uv run black --check gait_classification tests
 
   tests:
     name: Unit Tests

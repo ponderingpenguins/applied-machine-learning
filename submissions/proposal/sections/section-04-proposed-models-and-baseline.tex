@@ -10,15 +10,17 @@
 %     \item \textbf{Required:} At least 1 baseline and at least 1 ``full'' model.
 % \end{itemize}
 
-We plan to:
-\begin{itemize}
-    \item \textbf{Baseline:} FFT-based features with an SVM, or a similarly simple classical model.
-    \item \textbf{Deep learning model:} still to be decided, but it will likely be trained on raw or lightly processed windows.
-    \item \textbf{Loss:} triplet loss.
-    \item \textbf{Model comparison:} accuracy, precision, recall, F1 score, confusion matrix, and $K$-fold comparison.
-    \item \textbf{Hyperparameter search:} grid search.
-    \item \textbf{Regularization techniques:} dropout, L2 regularization, early stopping based on F1, batch normalization, layer normalization, and Adam for optimization.
-    \item \textbf{Hyperparameters to tune:} dropout, L2 strength, layer count, and node count.
-    \item \textbf{Deployment goal:} compress the model to run on a phone through pruning, compression, quantization, or related methods.
-    \item \textbf{Application goal:} build a web or phone app that records gyroscopic data live, feeds it to the model, and returns live predictions.
-\end{itemize}
+%We plan to:
+%\begin{itemize}
+%    \item \textbf{Baseline model:} a nearest-centroid or prototype-based classifier built on the FFT features from the preprocessing stage.
+%    \item \textbf{Main model:} a transformer trained on the 128-length gait windows, with triplet loss to learn an embedding space for verification.
+%    \item \textbf{Regularization:} dropout, L2 regularization, normalization layers, and early stopping.
+%    \item \textbf{Hyperparameter search:} grid search.
+%    \item \textbf{Hyperparameters to tune:} dropout, L2 strength, layer count, and node count.
+%    \item \textbf{Deployment goal:} compress the model to run on a phone through pruning, quantization, or related methods.
+%    \item \textbf{Application goal:} build a web or phone app that records gyroscopic data live, feeds it to the model, and returns live predictions.
+%\end{itemize}
+
+For the baseline, we will use a nearest-centroid or prototype-based classifier on the FFT features from preprocessing. This gives us a simple and cheap reference point that is easy to interpret and useful as a comparison against the transformer model. For the main model, we plan to use a transformer because it can learn non-linear relationships across the time dimension of the gait windows instead of relying only on hand-crafted summary features. The transformer will be trained with triplet loss as the primary training objective, so that windows from the same person move closer together in embedding space and windows from different people move farther apart. In addition, we will explore other metric-learning optimization techniques as extensions, while keeping triplet loss as the main loss function.
+
+We will use dropout, L2 regularization, and normalization layers to reduce overfitting. Early stopping will be based on the validation equal error rate (EER), since that is the clearest summary of verification performance for this task. These choices should also make the model easier to compress later, because a less overfit model is usually less sensitive when weights are pruned or quantized. For deployment, we want two levels of success, one for the base grade and one extra. The baseline goal is to expose the model through an API endpoint so the project is functional and can return predictions from sensor input. The extra goal is on-device deployment, so the phone itself can run the model locally with as little dependency on a server as possible. This would be the more applied version of the project and is the main stretch goal.
