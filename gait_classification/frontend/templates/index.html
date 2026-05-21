@@ -63,9 +63,9 @@
         acc_x: acc.x || 0,
         acc_y: acc.y || 0,
         acc_z: acc.z || 0,
-        gyr_x: (rot.alpha || 0) * Math.PI / 180,
-        gyr_y: (rot.beta  || 0) * Math.PI / 180,
-        gyr_z: (rot.gamma || 0) * Math.PI / 180,
+        gyr_x: rot.alpha || 0,
+        gyr_y: rot.beta  || 0,
+        gyr_z: rot.gamma || 0,
       });
 
       document.getElementById("progress").style.width = Math.min(100, samples.length / TARGET * 100) + "%";

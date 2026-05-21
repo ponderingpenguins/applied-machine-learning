@@ -6,14 +6,15 @@ Notes:
 - Todo: evaluate the model the same way as in the paper that we are comparing to
 
 Transformer training example:
-python train.py max_samples=500 batch_size=128 model_type=transformer 'preprocess_filters=[]'
+python train.py max_samples=500 batch_size=128 model_type=transformer 'preprocess_filters=[]' n_folds=1
 
 LSTM training example:
-python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filters=[]'
+python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filters=[]' n_folds=1
 """
 
 import logging
 import os
+import pickle
 import sys
 from typing import Optional
 
@@ -31,8 +32,8 @@ from gait_classification.data.gait_data import (
     build_windowed_data,
     fit_scaler,
     load_and_preprocess_data,
-    participant_split,
     make_kfold_splits,
+    participant_split,
 )
 from gait_classification.eval import compute_far_frr_eer
 from gait_classification.models.models import construct_model
@@ -120,11 +121,15 @@ def compute_embeddings(
 
 
 def summarize_fold_histories(
-    fold_histories: list[dict[str, list[float]]]
+    fold_histories: list[dict[str, list[float]]],
 ) -> dict[str, list[float]]:
     """Compute mean and std curves across fold histories."""
-    train_curves = [np.asarray(history["train_loss"], dtype=float) for history in fold_histories]
-    val_curves = [np.asarray(history["val_loss"], dtype=float) for history in fold_histories]
+    train_curves = [
+        np.asarray(history["train_loss"], dtype=float) for history in fold_histories
+    ]
+    val_curves = [
+        np.asarray(history["val_loss"], dtype=float) for history in fold_histories
+    ]
 
     min_train_len = min(len(curve) for curve in train_curves)
     min_val_len = min(len(curve) for curve in val_curves)
@@ -139,11 +144,6 @@ def summarize_fold_histories(
         "val_loss_std": val_stack.std(axis=0).tolist(),
         "n_folds": len(fold_histories),
     }
-
-
-
-
-
 
 
 def train_on_split(
@@ -178,10 +178,14 @@ def train_on_split(
 
     train_windows, train_labels = windows_scaled[train_mask], labels[train_mask]
     val_windows, val_labels = (
-        (windows_scaled[val_mask], labels[val_mask]) if val_mask is not None else (None, None)
+        (windows_scaled[val_mask], labels[val_mask])
+        if val_mask is not None
+        else (None, None)
     )
     test_windows, test_labels = (
-        (windows_scaled[test_mask], labels[test_mask]) if test_mask is not None else (None, None)
+        (windows_scaled[test_mask], labels[test_mask])
+        if test_mask is not None
+        else (None, None)
     )
 
     logger.info(
@@ -269,7 +273,9 @@ def train_on_split(
 
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     history_fname = (
-        f"training_history_fold{fold_idx}.json" if fold_idx is not None else "training_history.json"
+        f"training_history_fold{fold_idx}.json"
+        if fold_idx is not None
+        else "training_history.json"
     )
     history_path = os.path.join(cfg.checkpoint_dir, history_fname)
     with open(history_path, "w") as f:
@@ -294,7 +300,9 @@ def train_on_split(
         logger.info("Test EER: %.2f%%", eer * 100)
 
     if save_model:
-        final_model_path = os.path.join(cfg.checkpoint_dir, "final_model.pt")
+        final_model_path = os.path.join(
+            cfg.checkpoint_dir, f"final_model_{cfg.model_type}.pt"
+        )
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
@@ -311,14 +319,21 @@ def train_on_split(
         )
         logger.info("Final model saved to %s", final_model_path)
 
+        train_emb_by_pid = compute_embeddings(
+            model, train_windows, train_labels, device, cfg.batch_size
+        )
+        centroids = {
+            pid: emb.mean(axis=0) for pid, emb in train_emb_by_pid.items()
+        }
+        centroids_path = os.path.join(cfg.checkpoint_dir, f"centroids_{cfg.model_type}.pkl")
+        with open(centroids_path, "wb") as f:
+            pickle.dump(centroids, f)
+        logger.info("Centroids saved to %s", centroids_path)
+
     return {
         "train_loss": train_losses,
         "val_loss": val_losses,
     }
-
-
-
-
 
 
 def fooberino(cfg: TrainConfig) -> None:
@@ -364,7 +379,9 @@ def fooberino(cfg: TrainConfig) -> None:
 
         if fold_histories:
             cv_summary = summarize_fold_histories(fold_histories)
-            cv_summary_path = os.path.join(cfg.checkpoint_dir, "training_history_cv_mean.json")
+            cv_summary_path = os.path.join(
+                cfg.checkpoint_dir, "training_history_cv_mean.json"
+            )
             os.makedirs(cfg.checkpoint_dir, exist_ok=True)
             import json
 
@@ -381,7 +398,9 @@ def fooberino(cfg: TrainConfig) -> None:
                 cv_summary["val_loss_mean"][-1],
             )
 
-    logger.info("Retraining final model on all development participants before one test evaluation...")
+    logger.info(
+        "Retraining final model on all development participants before one test evaluation..."
+    )
     train_on_split(
         cfg,
         windows,
