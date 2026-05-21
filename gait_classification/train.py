@@ -119,6 +119,28 @@ def compute_embeddings(
     return embeddings_by_pid
 
 
+def summarize_fold_histories(
+    fold_histories: list[dict[str, list[float]]]
+) -> dict[str, list[float]]:
+    """Compute mean and std curves across fold histories."""
+    train_curves = [np.asarray(history["train_loss"], dtype=float) for history in fold_histories]
+    val_curves = [np.asarray(history["val_loss"], dtype=float) for history in fold_histories]
+
+    min_train_len = min(len(curve) for curve in train_curves)
+    min_val_len = min(len(curve) for curve in val_curves)
+
+    train_stack = np.stack([curve[:min_train_len] for curve in train_curves], axis=0)
+    val_stack = np.stack([curve[:min_val_len] for curve in val_curves], axis=0)
+
+    return {
+        "train_loss_mean": train_stack.mean(axis=0).tolist(),
+        "train_loss_std": train_stack.std(axis=0).tolist(),
+        "val_loss_mean": val_stack.mean(axis=0).tolist(),
+        "val_loss_std": val_stack.std(axis=0).tolist(),
+        "n_folds": len(fold_histories),
+    }
+
+
 
 
 
@@ -289,6 +311,11 @@ def train_on_split(
         )
         logger.info("Final model saved to %s", final_model_path)
 
+    return {
+        "train_loss": train_losses,
+        "val_loss": val_losses,
+    }
+
 
 
 
@@ -317,11 +344,12 @@ def fooberino(cfg: TrainConfig) -> None:
     train_pids, val_pids, test_pids = participant_split(participants, cfg)
     development_pids = np.concatenate([train_pids, val_pids])
 
+    fold_histories = []
     if cfg.n_folds and cfg.n_folds > 1:
         folds = make_kfold_splits(development_pids, cfg)
         for i, (t_pids, v_pids) in enumerate(folds):
             logger.info("=== Running development fold %d/%d ===", i + 1, cfg.n_folds)
-            train_on_split(
+            fold_history = train_on_split(
                 cfg,
                 windows,
                 labels,
@@ -331,6 +359,26 @@ def fooberino(cfg: TrainConfig) -> None:
                 device=device,
                 criterion=criterion,
                 fold_idx=i + 1,
+            )
+            fold_histories.append(fold_history)
+
+        if fold_histories:
+            cv_summary = summarize_fold_histories(fold_histories)
+            cv_summary_path = os.path.join(cfg.checkpoint_dir, "training_history_cv_mean.json")
+            os.makedirs(cfg.checkpoint_dir, exist_ok=True)
+            import json
+
+            with open(cv_summary_path, "w") as f:
+                json.dump(cv_summary, f)
+            logger.info(
+                "Saved CV mean history to %s (folds=%d)",
+                cv_summary_path,
+                cv_summary["n_folds"],
+            )
+            logger.info(
+                "CV mean final losses: train=%.4f val=%.4f",
+                cv_summary["train_loss_mean"][-1],
+                cv_summary["val_loss_mean"][-1],
             )
 
     logger.info("Retraining final model on all development participants before one test evaluation...")
