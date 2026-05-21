@@ -135,6 +135,23 @@ def participant_split(
     return train_pids, val_pids, test_pids
 
 
+def make_kfold_splits(
+    participants: np.ndarray, cfg: TrainConfig
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Make participant-wise train/validation folds inside a development pool, dont know if we want nested or something else so this for now"""
+    rng = np.random.default_rng(cfg.seed)
+    shuffled = rng.permutation(participants)
+    folds = np.array_split(shuffled, cfg.n_folds)
+
+    splits = []
+    for k in range(cfg.n_folds):
+        val_pids = folds[k]
+        train_pids = np.concatenate([folds[j] for j in range(cfg.n_folds) if j != k])
+        splits.append((train_pids, val_pids))
+
+    return splits
+
+
 def fit_scaler(
     cfg: TrainConfig, windows: np.ndarray, labels: np.ndarray, train_pids: np.ndarray
 ) -> StandardScaler:

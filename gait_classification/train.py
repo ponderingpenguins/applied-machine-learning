@@ -15,6 +15,7 @@ python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filte
 import logging
 import os
 import sys
+from typing import Optional
 
 import numpy as np
 import torch
@@ -31,6 +32,7 @@ from gait_classification.data.gait_data import (
     fit_scaler,
     load_and_preprocess_data,
     participant_split,
+    make_kfold_splits,
 )
 from gait_classification.eval import compute_far_frr_eer
 from gait_classification.models.models import construct_model
@@ -117,50 +119,57 @@ def compute_embeddings(
     return embeddings_by_pid
 
 
-def fooberino(cfg: TrainConfig) -> None:
-    """train the model"""
-    logger.info("Training with config: %s", cfg)
 
-    logger.info("Loading and windowing data...")
 
-    preprocess_functions = construct_filters(cfg)
-    raw, y = load_and_preprocess_data(cfg, preprocess_functions=preprocess_functions)
-    windows, labels = build_windowed_data(cfg, raw, y)
-    logger.info("Total windows: %d", len(windows))
 
-    participants = np.unique(labels)
-    logger.info("Total participants: %d", len(participants))
 
-    train_pids, val_pids, test_pids = participant_split(participants, cfg)
-    logger.info(
-        "Train: %d, Val: %d, Test: %d participants",
+
+def train_on_split(
+    cfg: TrainConfig,
+    windows: np.ndarray,
+    labels: np.ndarray,
+    train_pids,
+    val_pids=None,
+    test_pids=None,
+    device: torch.device = None,
+    criterion: OnlineTripletLoss = None,
+    fold_idx: Optional[int] = None,
+    save_model: bool = False,
+):
+    """Train/evaluate on a single participant split."""
+
+    split_msg = "Train participants: %d, Val participants: %d" % (
         len(train_pids),
-        len(val_pids),
-        len(test_pids),
+        len(val_pids) if val_pids is not None else 0,
     )
+    if test_pids is not None:
+        split_msg += ", Test participants: %d" % len(test_pids)
+    logger.info(split_msg)
 
     # z-score normalization using only training data statistics
     scaler = fit_scaler(cfg, windows, labels, train_pids)
-    windows = apply_scaler(windows, scaler)
+    windows_scaled = apply_scaler(windows, scaler)
 
     train_mask = np.isin(labels, train_pids)
-    val_mask = np.isin(labels, val_pids)
-    test_mask = np.isin(labels, test_pids)
+    val_mask = np.isin(labels, val_pids) if val_pids is not None else None
+    test_mask = np.isin(labels, test_pids) if test_pids is not None else None
 
-    train_windows, train_labels = windows[train_mask], labels[train_mask]
-    val_windows, val_labels = windows[val_mask], labels[val_mask]
-    test_windows, test_labels = windows[test_mask], labels[test_mask]
+    train_windows, train_labels = windows_scaled[train_mask], labels[train_mask]
+    val_windows, val_labels = (
+        (windows_scaled[val_mask], labels[val_mask]) if val_mask is not None else (None, None)
+    )
+    test_windows, test_labels = (
+        (windows_scaled[test_mask], labels[test_mask]) if test_mask is not None else (None, None)
+    )
 
     logger.info(
-        "Train windows: %d, Val windows: %d, Test windows: %d",
+        "Train windows: %d, Val windows: %d%s",
         len(train_windows),
-        len(val_windows),
-        len(test_windows),
+        len(val_windows) if val_windows is not None else 0,
+        ", Test windows: %d" % len(test_windows) if test_windows is not None else "",
     )
 
     train_ds = GaitWindowDataset(train_windows, train_labels)
-    val_ds = GaitWindowDataset(val_windows, val_labels)
-
     class_counts = np.bincount(train_labels)
     weights = 1.0 / class_counts[train_labels]
     train_sampler = WeightedRandomSampler(
@@ -173,20 +182,22 @@ def fooberino(cfg: TrainConfig) -> None:
         num_workers=0,
         pin_memory=True,
     )
-    val_loader = DataLoader(
-        val_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=0, pin_memory=True
+    val_loader = (
+        DataLoader(
+            GaitWindowDataset(val_windows, val_labels),
+            batch_size=cfg.batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=True,
+        )
+        if val_windows is not None
+        else None
     )
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = torch.device("mps" if torch.backends.mps.is_available() else device)
-    logger.info("Using device: %s", device)
 
     model = construct_model(cfg, device)
 
-    criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
 
-    best_val_loss = float("inf")
     train_losses = []
     val_losses = []
 
@@ -202,74 +213,139 @@ def fooberino(cfg: TrainConfig) -> None:
             train=True,
         )
 
-        model.eval()
-        with torch.no_grad():
-            val_loss = _run_epoch(
-                model,
-                val_loader,
-                criterion,
-                None,
-                device,
-                train=False,
+        train_losses.append(train_loss)
+
+        if val_loader is not None:
+            model.eval()
+            with torch.no_grad():
+                val_loss = _run_epoch(
+                    model,
+                    val_loader,
+                    criterion,
+                    None,
+                    device,
+                    train=False,
+                )
+            val_losses.append(val_loss)
+            logger.info(
+                "Epoch %d/%d  train_loss=%.4f  val_loss=%.4f",
+                epoch + 1,
+                cfg.num_epochs,
+                train_loss,
+                val_loss,
+            )
+        else:
+            logger.info(
+                "Epoch %d/%d  train_loss=%.4f",
+                epoch + 1,
+                cfg.num_epochs,
+                train_loss,
             )
 
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
-
-        logger.info(
-            "Epoch %d/%d  train_loss=%.4f  val_loss=%.4f",
-            epoch + 1,
-            cfg.num_epochs,
-            train_loss,
-            val_loss,
-        )
-
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            model.save_a_checkpoint(optimizer, epoch, val_loss, cfg)
-
-    logger.info("Training complete. Saving training history...")
+    logger.info("Training complete. Saving history for this run...")
     import json
 
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
-    history_path = os.path.join(cfg.checkpoint_dir, "training_history.json")
+    history_fname = (
+        f"training_history_fold{fold_idx}.json" if fold_idx is not None else "training_history.json"
+    )
+    history_path = os.path.join(cfg.checkpoint_dir, history_fname)
     with open(history_path, "w") as f:
         json.dump({"train_loss": train_losses, "val_loss": val_losses}, f)
     logger.info("Training history saved to %s", history_path)
 
-    logger.info("Evaluating on test set...")
-    model.eval()
+    if test_pids is not None and len(test_pids) > 0:
+        logger.info("Evaluating on test set...")
+        model.eval()
 
-    train_emb_by_pid = compute_embeddings(
-        model, train_windows, train_labels, device, cfg.batch_size
-    )
-    test_emb_by_pid = compute_embeddings(
-        model, test_windows, test_labels, device, cfg.batch_size
-    )
+        train_emb_by_pid = compute_embeddings(
+            model, train_windows, train_labels, device, cfg.batch_size
+        )
+        test_emb_by_pid = compute_embeddings(
+            model, test_windows, test_labels, device, cfg.batch_size
+        )
 
-    eer, _, _, _ = compute_far_frr_eer(
-        train_emb_by_pid, test_emb_by_pid, test_labels, train_pids
-    )
+        eer, _, _, _ = compute_far_frr_eer(
+            train_emb_by_pid, test_emb_by_pid, test_labels, train_pids
+        )
 
-    logger.info("Test EER: %.2f%%", eer * 100)
+        logger.info("Test EER: %.2f%%", eer * 100)
 
-    os.makedirs(cfg.checkpoint_dir, exist_ok=True)
-    final_model_path = os.path.join(cfg.checkpoint_dir, "final_model.pt")
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "model_type": cfg.model_type,
-            "embedding_size": cfg.embedding_size,
-            "input_size": 6,
-            "hidden_size": 128,
-            "num_layers": 2,
-            "d_model": 64,
-            "nhead": 4,
-            "dim_feedforward": 256,
-        },
-        final_model_path,
+    if save_model:
+        final_model_path = os.path.join(cfg.checkpoint_dir, "final_model.pt")
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "model_type": cfg.model_type,
+                "embedding_size": cfg.embedding_size,
+                "input_size": 6,
+                "hidden_size": 128,
+                "num_layers": 2,
+                "d_model": 64,
+                "nhead": 4,
+                "dim_feedforward": 256,
+            },
+            final_model_path,
+        )
+        logger.info("Final model saved to %s", final_model_path)
+
+
+
+
+
+
+def fooberino(cfg: TrainConfig) -> None:
+    """train the model"""
+    logger.info("Training with config: %s", cfg)
+
+    logger.info("Loading and windowing data...")
+
+    preprocess_functions = construct_filters(cfg)
+    raw, y = load_and_preprocess_data(cfg, preprocess_functions=preprocess_functions)
+    windows, labels = build_windowed_data(cfg, raw, y)
+    logger.info("Total windows: %d", len(windows))
+
+    participants = np.unique(labels)
+    logger.info("Total participants: %d", len(participants))
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else device)
+    logger.info("Using device: %s", device)
+
+    criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
+
+    train_pids, val_pids, test_pids = participant_split(participants, cfg)
+    development_pids = np.concatenate([train_pids, val_pids])
+
+    if cfg.n_folds and cfg.n_folds > 1:
+        folds = make_kfold_splits(development_pids, cfg)
+        for i, (t_pids, v_pids) in enumerate(folds):
+            logger.info("=== Running development fold %d/%d ===", i + 1, cfg.n_folds)
+            train_on_split(
+                cfg,
+                windows,
+                labels,
+                t_pids,
+                v_pids,
+                test_pids=None,
+                device=device,
+                criterion=criterion,
+                fold_idx=i + 1,
+            )
+
+    logger.info("Retraining final model on all development participants before one test evaluation...")
+    train_on_split(
+        cfg,
+        windows,
+        labels,
+        development_pids,
+        val_pids=None,
+        test_pids=test_pids,
+        device=device,
+        criterion=criterion,
+        fold_idx=None,
+        save_model=True,
     )
-    logger.info("Final model saved to %s", final_model_path)
 
 
 def main() -> None:
