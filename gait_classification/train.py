@@ -324,6 +324,7 @@ def train_on_split(
 def fooberino(cfg: TrainConfig) -> None:
     """train the model"""
     logger.info("Training with config: %s", cfg)
+    os.makedirs(cfg.checkpoint_dir, exist_ok=True)
 
     logger.info("Loading and windowing data...")
 

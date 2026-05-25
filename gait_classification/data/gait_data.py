@@ -1,3 +1,4 @@
+import os
 import pickle
 from typing import Optional
 
@@ -174,6 +175,7 @@ def fit_scaler(
     scaler.fit(train_windows_flat)
 
     # Pickle and save the scaler for later use in inference
+    os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     with open(f"{cfg.checkpoint_dir}/scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
 
