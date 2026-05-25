@@ -280,15 +280,13 @@ def train_on_split(
         logger.info("Evaluating on test set...")
         model.eval()
 
-        train_emb_by_pid = compute_embeddings(
-            model, train_windows, train_labels, device, cfg.batch_size
-        )
         test_emb_by_pid = compute_embeddings(
             model, test_windows, test_labels, device, cfg.batch_size
         )
 
         eer, _, _, _ = compute_far_frr_eer(
-            train_emb_by_pid, test_emb_by_pid, test_labels, train_pids
+            test_emb_by_pid,
+            seed=cfg.seed,
         )
 
         logger.info("Test EER: %.2f%%", eer * 100)
