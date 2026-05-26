@@ -151,7 +151,7 @@
         <section class="hero">
             <div class="eyebrow">Gait classification</div>
             <h1>${selected_label} model page.</h1>
-            <p class="intro">Use this model to add a trusted user from a file upload or from a new recording, then move to user classification.</p>
+            <p class="intro">Enroll a trusted user by walking for 60 seconds, then classify users against the enrolled set.</p>
         </section>
 
         <section class="layout">
@@ -164,26 +164,52 @@
 
                     <div class="summary">
                         <strong>Selected model</strong>
-                        <p>
-                            ${selected_label} is ready for trusted-user enrollment and classification.
-                        </p>
+                        <p>${selected_label} is ready for trusted-user enrollment and classification.</p>
                         <p>${status_message}</p>
                     </div>
 
                     <div class="workflow" id="add-trusted-user">
                         <h2>Add trusted user</h2>
-                        <p>
-                            Upload raw data or record your own data. We will encode the raw data with a forward pass on our model to create the trusted user embedding.
-                        </p>
-                        <form class="form-grid" method="post" action="/models/${selected_model_value}/encode" enctype="multipart/form-data">
-                            <label for="trusted_user_file">Upload a file</label>
-                            <input id="trusted_user_file" name="trusted_user_file" type="file">
-                            <input type="hidden" name="source_mode" value="upload">
-                            <div class="button-row">
-                                <button type="submit">Add trusted user</button>
-                                <button type="submit" name="source_mode" value="record" class="secondary">Record your own data</button>
+
+                        <!-- Recording UI (shown when devicemotion is available) -->
+                        <div id="record-ui">
+                            <div id="record-home">
+                                <p>Walk naturally for 60 seconds with your phone in your pocket. We will encode your gait using the model.</p>
+                                <div class="button-row">
+                                    <button onclick="startEnrollment()">Start Recording</button>
+                                </div>
                             </div>
-                        </form>
+
+                            <div id="record-collecting" style="display:none">
+                                <p>Keep walking...</p>
+                                <div class="summary" style="margin-top:12px">
+                                    <strong id="record-countdown">60s remaining</strong>
+                                    <div style="margin-top:10px;background:#c8e6e3;border-radius:14px;height:8px;overflow:hidden">
+                                        <div id="record-progress" style="height:100%;background:var(--accent);width:0%;transition:width 1s linear"></div>
+                                    </div>
+                                    <p id="record-sample-count" style="margin-top:6px;font-size:0.85rem">0 samples collected</p>
+                                </div>
+                            </div>
+
+                            <div id="record-done" style="display:none">
+                                <p id="record-done-msg"></p>
+                                <div class="button-row">
+                                    <button onclick="startEnrollment()">Record Again</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CSV fallback (shown when devicemotion is unavailable) -->
+                        <div id="upload-ui" style="display:none">
+                            <p>Motion sensors not available on this device. Upload a CSV file with columns: <code>acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z</code> (one row per sample, no header required).</p>
+                            <form class="form-grid" method="post" action="/models/${selected_model_value}/encode" enctype="multipart/form-data">
+                                <label for="trusted_user_file">Upload CSV file</label>
+                                <input id="trusted_user_file" name="trusted_user_file" type="file" accept=".csv,.txt">
+                                <div class="button-row">
+                                    <button type="submit">Enroll from file</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -192,9 +218,7 @@
                 <div class="panel__body">
                     <div class="summary">
                         <strong>Next step</strong>
-                        <p>
-                            After enrollment, open the classification page to compare a user against the trusted set for this model.
-                        </p>
+                        <p>After enrollment, open the classification page to compare a user against the trusted set for this model.</p>
                     </div>
                     <div class="helper-links">
                         <a href="/models/${selected_model_value}/classify">Open classification page</a>
@@ -204,5 +228,115 @@
             </aside>
         </section>
     </main>
+
+    <script>
+        const ENROLL_DURATION_MS = 60000;
+        let enrollSamples = [];
+        let enrollCollecting = false;
+        let enrollTimer = null;
+        const MODEL_TYPE = "${selected_model_value}";
+
+        function showEl(id) { document.getElementById(id).style.display = ""; }
+        function hideEl(id) { document.getElementById(id).style.display = "none"; }
+
+        // Detect devicemotion support
+        if (typeof DeviceMotionEvent === "undefined") {
+            hideEl("record-ui");
+            showEl("upload-ui");
+        }
+
+        function onEnrollMotion(e) {
+            if (!enrollCollecting) return;
+            const acc = e.accelerationIncludingGravity;
+            const rot = e.rotationRate;
+            if (!acc || !rot) return;
+
+            enrollSamples.push({
+                acc_x: acc.x || 0,
+                acc_y: acc.y || 0,
+                acc_z: acc.z || 0,
+                gyr_x: rot.alpha || 0,
+                gyr_y: rot.beta || 0,
+                gyr_z: rot.gamma || 0,
+            });
+
+            document.getElementById("record-sample-count").textContent = enrollSamples.length + " samples collected";
+        }
+
+        async function startEnrollment() {
+            enrollSamples = [];
+
+            if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+                try {
+                    const perm = await DeviceMotionEvent.requestPermission();
+                    if (perm !== "granted") {
+                        hideEl("record-ui");
+                        showEl("upload-ui");
+                        return;
+                    }
+                } catch (err) {
+                    hideEl("record-ui");
+                    showEl("upload-ui");
+                    return;
+                }
+            }
+
+            enrollCollecting = true;
+            hideEl("record-home");
+            hideEl("record-done");
+            showEl("record-collecting");
+            document.getElementById("record-progress").style.width = "0%";
+            document.getElementById("record-countdown").textContent = "60s remaining";
+            window.addEventListener("devicemotion", onEnrollMotion);
+
+            const startTime = Date.now();
+            enrollTimer = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const remaining = Math.max(0, ENROLL_DURATION_MS - elapsed);
+                const pct = Math.min(100, (elapsed / ENROLL_DURATION_MS) * 100);
+                document.getElementById("record-progress").style.width = pct + "%";
+                document.getElementById("record-countdown").textContent = Math.ceil(remaining / 1000) + "s remaining";
+
+                if (elapsed >= ENROLL_DURATION_MS) {
+                    clearInterval(enrollTimer);
+                    finishEnrollment();
+                }
+            }, 500);
+        }
+
+        async function finishEnrollment() {
+            enrollCollecting = false;
+            window.removeEventListener("devicemotion", onEnrollMotion);
+            hideEl("record-collecting");
+
+            const n = enrollSamples.length;
+            if (n === 0) {
+                document.getElementById("record-done-msg").textContent = "No samples collected. Make sure motion is enabled.";
+                showEl("record-done");
+                showEl("record-home");
+                return;
+            }
+
+            try {
+                const resp = await fetch("/models/" + MODEL_TYPE + "/encode-recording", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ samples: enrollSamples }),
+                });
+                if (resp.ok) {
+                    // Server returns a full page — reload to show the status message
+                    location.reload();
+                } else {
+                    document.getElementById("record-done-msg").textContent = "Server error: " + resp.status;
+                    showEl("record-done");
+                    showEl("record-home");
+                }
+            } catch (err) {
+                document.getElementById("record-done-msg").textContent = "Network error: " + err.message;
+                showEl("record-done");
+                showEl("record-home");
+            }
+        }
+    </script>
 </body>
 </html>
