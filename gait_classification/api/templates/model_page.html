@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${selected_label} Model</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f7fb;
+            --panel: #ffffff;
+            --ink: #132033;
+            --muted: #5e6b7e;
+            --accent: #0f766e;
+            --accent-soft: #d9f0ed;
+            --border: #d7e0ea;
+            --shadow: 0 18px 40px rgba(19, 32, 51, 0.08);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top left, #e8f4ff 0, transparent 35%),
+                        linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+            color: var(--ink);
+        }
+        .shell {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 48px 24px 64px;
+        }
+        .hero {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .eyebrow {
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            font-size: 0.78rem;
+            color: var(--accent);
+            font-weight: 700;
+        }
+        h1 {
+            margin: 0;
+            font-size: clamp(2.2rem, 4vw, 3.6rem);
+            line-height: 1.02;
+        }
+        .intro {
+            max-width: 68ch;
+            margin: 0;
+            font-size: 1.05rem;
+            color: var(--muted);
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 24px;
+            align-items: start;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .panel__body { padding: 24px; }
+        .action-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+        .selection__link {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 14px;
+            padding: 14px 18px;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .summary {
+            padding: 16px;
+            border-radius: 18px;
+            background: var(--accent-soft);
+            color: #0f3d3a;
+        }
+        .summary strong { display: block; margin-bottom: 6px; }
+        .workflow {
+            margin-top: 18px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: linear-gradient(180deg, #fff 0%, #fafdff 100%);
+        }
+        .workflow h2 { margin: 0 0 8px; font-size: 1.3rem; }
+        .workflow p { margin: 0 0 14px; color: var(--muted); }
+        .form-grid {
+            display: grid;
+            gap: 12px;
+        }
+        .form-grid label {
+            font-weight: 700;
+            color: var(--ink);
+        }
+        .form-grid input[type="file"] {
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            padding: 12px;
+            background: #fff;
+            font: inherit;
+        }
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .button-row button {
+            border: 0;
+            border-radius: 14px;
+            padding: 14px 18px;
+            font: inherit;
+            font-weight: 700;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+        }
+        .button-row button.secondary {
+            background: #e7edf3;
+            color: var(--ink);
+        }
+        .button-row button:hover { filter: brightness(1.03); }
+        .helper-links {
+            display: grid;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .helper-links a { color: var(--accent); text-decoration: none; font-weight: 700; }
+        @media (max-width: 860px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <div class="eyebrow">Gait classification</div>
+            <h1>${selected_label} model page.</h1>
+            <p class="intro">Use this model to add a trusted user from a file upload or from a new recording, then move to user classification.</p>
+        </section>
+
+        <section class="layout">
+            <div class="panel">
+                <div class="panel__body">
+                    <div class="action-row">
+                        <a class="selection__link" href="#add-trusted-user">Add trusted user</a>
+                        <a class="selection__link" href="/models/${selected_model_value}/classify">Classify user</a>
+                    </div>
+
+                    <div class="summary">
+                        <strong>Selected model</strong>
+                        <p>
+                            ${selected_label} is ready for trusted-user enrollment and classification.
+                        </p>
+                        <p>${status_message}</p>
+                    </div>
+
+                    <div class="workflow" id="add-trusted-user">
+                        <h2>Add trusted user</h2>
+                        <p>
+                            Upload raw data or record your own data. We will encode the raw data with a forward pass on our model to create the trusted user embedding.
+                        </p>
+                        <form class="form-grid" method="post" action="/models/${selected_model_value}/encode" enctype="multipart/form-data">
+                            <label for="trusted_user_file">Upload a file</label>
+                            <input id="trusted_user_file" name="trusted_user_file" type="file">
+                            <input type="hidden" name="source_mode" value="upload">
+                            <div class="button-row">
+                                <button type="submit">Add trusted user</button>
+                                <button type="submit" name="source_mode" value="record" class="secondary">Record your own data</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="panel">
+                <div class="panel__body">
+                    <div class="summary">
+                        <strong>Next step</strong>
+                        <p>
+                            After enrollment, open the classification page to compare a user against the trusted set for this model.
+                        </p>
+                    </div>
+                    <div class="helper-links">
+                        <a href="/models/${selected_model_value}/classify">Open classification page</a>
+                        <a href="/models">Back to model selection</a>
+                    </div>
+                </div>
+            </aside>
+        </section>
+    </main>
+</body>
+</html>
