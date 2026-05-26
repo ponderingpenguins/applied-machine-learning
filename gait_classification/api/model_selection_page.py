@@ -1,12 +1,23 @@
-"""HTML rendering helpers for the model selection page."""
+"""HTML rendering helpers for the model selection and model pages."""
 
 from collections.abc import Iterable
+from html import escape
+from pathlib import Path
+from string import Template
 
 from gait_classification.utils import ModelType
+
+TEMPLATES_DIR = Path(__file__).with_name("templates")
 
 
 def _model_label(model_type: ModelType) -> str:
     return model_type.value.replace("_", " ").title()
+
+
+def _render_template(template_name: str, **context: str) -> str:
+    template_path = TEMPLATES_DIR / template_name
+    template = Template(template_path.read_text(encoding="utf-8"))
+    return template.safe_substitute(context)
 
 
 def render_model_selection_page(
@@ -21,223 +32,40 @@ def render_model_selection_page(
         f"""
         <article class=\"model-card {'selected' if model_type == selected_model else ''}\">
             <div class=\"model-card__eyebrow\">Available model</div>
-            <h2>{_model_label(model_type)}</h2>
-            <p>Type: <strong>{model_type.value}</strong></p>
+            <h2>{escape(_model_label(model_type))}</h2>
+            <p>Type: <strong>{escape(model_type.value)}</strong></p>
             <p>Use this model for embedding generation and classification.</p>
-            <a class=\"model-card__link\" href=\"/models/{model_type.value}\">Open model page</a>
         </article>
         """
         for model_type in model_options
     )
 
     option_html = "".join(
-        f'<option value="{model_type.value}" {"selected" if model_type == selected_model else ""}>{_model_label(model_type)}</option>'
+        f'<option value="{escape(model_type.value)}" {"selected" if model_type == selected_model else ""}>{escape(_model_label(model_type))}</option>'
         for model_type in model_options
     )
 
-    return f"""<!doctype html>
-<html lang=\"en\">
-<head>
-    <meta charset=\"utf-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-    <title>Gait Models</title>
-    <style>
-        :root {{
-            color-scheme: light;
-            --bg: #f4f7fb;
-            --panel: #ffffff;
-            --ink: #132033;
-            --muted: #5e6b7e;
-            --accent: #0f766e;
-            --accent-soft: #d9f0ed;
-            --border: #d7e0ea;
-            --shadow: 0 18px 40px rgba(19, 32, 51, 0.08);
-        }}
-        * {{ box-sizing: border-box; }}
-        body {{
-            margin: 0;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: radial-gradient(circle at top left, #e8f4ff 0, transparent 35%),
-                        linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
-            color: var(--ink);
-        }}
-        .shell {{
-            max-width: 1120px;
-            margin: 0 auto;
-            padding: 48px 24px 64px;
-        }}
-        .hero {{
-            display: grid;
-            gap: 16px;
-            margin-bottom: 28px;
-        }}
-        .eyebrow {{
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            font-size: 0.78rem;
-            color: var(--accent);
-            font-weight: 700;
-        }}
-        h1 {{
-            margin: 0;
-            font-size: clamp(2.2rem, 4vw, 3.6rem);
-            line-height: 1.02;
-        }}
-        .intro {{
-            max-width: 68ch;
-            margin: 0;
-            font-size: 1.05rem;
-            color: var(--muted);
-        }}
-        .layout {{
-            display: grid;
-            grid-template-columns: 1.2fr 0.8fr;
-            gap: 24px;
-            align-items: start;
-        }}
-        .panel {{
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }}
-        .panel__body {{ padding: 24px; }}
-        .model-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 16px;
-        }}
-        .model-card {{
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 18px;
-            background: linear-gradient(180deg, #fff 0%, #fafdff 100%);
-            transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
-        }}
-        .model-card.selected {{
-            border-color: var(--accent);
-            box-shadow: 0 14px 28px rgba(15, 118, 110, 0.12);
-            transform: translateY(-2px);
-        }}
-        .model-card__eyebrow {{
-            font-size: 0.78rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--accent);
-            font-weight: 700;
-            margin-bottom: 10px;
-        }}
-        .model-card h2 {{ margin: 0 0 8px; font-size: 1.25rem; }}
-        .model-card p {{ margin: 0 0 8px; color: var(--muted); }}
-        .model-card__link {{
-            display: inline-flex;
-            align-items: center;
-            margin-top: 6px;
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 700;
-        }}
-        .selection {{
-            display: grid;
-            gap: 12px;
-        }}
-        .selection label {{
-            font-weight: 700;
-            color: var(--ink);
-        }}
-        .selection select {{
-            width: 100%;
-            border-radius: 14px;
-            border: 1px solid var(--border);
-            padding: 14px 16px;
-            font: inherit;
-            background: #fff;
-        }}
-        .selection button {{
-            border: 0;
-            border-radius: 14px;
-            padding: 14px 18px;
-            font: inherit;
-            font-weight: 700;
-            background: var(--accent);
-            color: white;
-            cursor: pointer;
-        }}
-        .selection button:hover {{ filter: brightness(1.03); }}
-        .selection__link {{
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            border-radius: 14px;
-            padding: 14px 18px;
-            background: var(--accent);
-            color: white;
-            text-decoration: none;
-            font-weight: 700;
-        }}
-        .summary {{
-            margin-top: 18px;
-            padding: 16px;
-            border-radius: 18px;
-            background: var(--accent-soft);
-            color: #0f3d3a;
-        }}
-        .summary strong {{ display: block; margin-bottom: 6px; }}
-        .links {{
-            display: grid;
-            gap: 10px;
-            margin-top: 18px;
-        }}
-        .links a {{ color: var(--accent); text-decoration: none; font-weight: 700; }}
-        @media (max-width: 860px) {{
-            .layout {{ grid-template-columns: 1fr; }}
-        }}
-    </style>
-</head>
-<body>
-    <main class=\"shell\">
-        <section class=\"hero\">
-            <div class=\"eyebrow\">Gait classification</div>
-            <h1>Choose a model to inspect or use.</h1>
-            <p class=\"intro\">This page lists the models currently loaded in the API and gives you a quick selection window for switching between them.</p>
-        </section>
+    return _render_template(
+        "model_selection.html",
+        cards_html=cards_html,
+        option_html=option_html,
+        selected_label=escape(selected_label),
+        selected_model_value=escape(selected_model.value),
+    )
 
-        <section class=\"layout\">
-            <div class=\"panel\">
-                <div class=\"panel__body\">
-                    <div class=\"model-grid\">
-                        {cards_html}
-                    </div>
-                </div>
-            </div>
 
-            <aside class=\"panel\">
-                <div class=\"panel__body\">
-                    <form class=\"selection\" method=\"get\" action=\"/models\">
-                        <label for=\"model_type\">Select a model</label>
-                        <select id=\"model_type\" name=\"model_type\" onchange=\"window.location.href='/models/' + this.value\">
-                            {option_html}
-                        </select>
-                    </form>
+def render_model_page(selected_model: ModelType, status_message: str = "") -> str:
+    return _render_template(
+        "model_page.html",
+        selected_label=escape(_model_label(selected_model)),
+        selected_model_value=escape(selected_model.value),
+        status_message=escape(status_message),
+    )
 
-                    <div class=\"summary\">
-                        <strong>Selected model</strong>
-                        <text>
-                        Using our {selected_label} model, you can encode new gaits to generate embeddings or classify gaits based on previously encoded data. Use the buttons below to get started.<text>
-                        <div>
-                            <button onclick=\"window.location.href='/models/{selected_model.forward()}'\">Encode a new gait</button>
-                            <button onclick=\"window.location.href='/models/{selected_model.value}'\">Classify a gait</button>
-                        </div>
-                    </div>
 
-                    <div class=\"links\">
-                        <a href=\"/models/data\">View model list as JSON</a>
-                        <a href=\"/docs\">Open API docs</a>
-                    </div>
-                </div>
-            </aside>
-        </section>
-    </main>
-</body>
-</html>"""
+def render_classify_user_page(selected_model: ModelType) -> str:
+    return _render_template(
+        "classify_user.html",
+        selected_label=escape(_model_label(selected_model)),
+        selected_model_value=escape(selected_model.value),
+    )
