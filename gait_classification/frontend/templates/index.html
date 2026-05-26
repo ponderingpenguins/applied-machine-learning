@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gait Classification</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
+  <div class="max-w-sm w-full mx-auto p-6">
+
+    <div id="home" class="text-center">
+      <h1 class="text-3xl font-bold mb-2">Gait Classifier</h1>
+      <p class="text-gray-400 mb-8">Walk with your phone in your pocket for a few seconds.</p>
+      <button id="startBtn" onclick="startCapture()"
+              class="px-8 py-4 bg-blue-600 text-white text-lg rounded-xl hover:bg-blue-500 active:scale-95 transition">
+        Start
+      </button>
+    </div>
+
+    <div id="collecting" class="text-center hidden">
+      <div class="text-5xl mb-4 animate-pulse">🚶</div>
+      <h2 class="text-xl font-semibold mb-2">Walk now...</h2>
+      <p class="text-gray-400 mb-4">Collecting sensor data</p>
+      <div class="w-full bg-gray-700 rounded-full h-2">
+        <div id="progress" class="bg-blue-500 h-2 rounded-full transition-all duration-100" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div id="result" class="text-center hidden"></div>
+
+    <div id="error" class="text-center hidden">
+      <div class="text-5xl mb-4">⚠️</div>
+      <p id="errorMsg" class="text-red-400 mb-6"></p>
+      <button onclick="location.reload()"
+              class="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+        Try Again
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    const TARGET = 128;
+    let samples = [];
+    let collecting = false;
+
+    function show(id) {
+      ["home", "collecting", "result", "error"].forEach(s => {
+        document.getElementById(s).classList.add("hidden");
+      });
+      document.getElementById(id).classList.remove("hidden");
+    }
+
+    function onMotion(e) {
+      if (!collecting) return;
+      const acc = e.accelerationIncludingGravity;
+      const rot = e.rotationRate;
+      if (!acc || !rot) return;
+
+      samples.push({
+        acc_x: acc.x || 0,
+        acc_y: acc.y || 0,
+        acc_z: acc.z || 0,
+        gyr_x: rot.alpha || 0,
+        gyr_y: rot.beta  || 0,
+        gyr_z: rot.gamma || 0,
+      });
+
+      document.getElementById("progress").style.width = Math.min(100, samples.length / TARGET * 100) + "%";
+
+      if (samples.length >= TARGET) {
+        collecting = false;
+        window.removeEventListener("devicemotion", onMotion);
+        sendData();
+      }
+    }
+
+    async function sendData() {
+      show("collecting");
+      document.getElementById("progress").style.width = "100%";
+
+      const resp = await fetch("/classify", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({samples: samples.slice(0, TARGET)}),
+      });
+
+      if (!resp.ok) {
+        document.getElementById("errorMsg").textContent = "Server error: " + resp.status;
+        show("error");
+        return;
+      }
+
+      document.getElementById("result").innerHTML = await resp.text();
+      show("result");
+    }
+
+    async function startCapture() {
+      samples = [];
+
+      // iOS requires explicit permission
+      if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+        try {
+          const perm = await DeviceMotionEvent.requestPermission();
+          if (perm !== "granted") {
+            document.getElementById("errorMsg").textContent = "Motion permission denied.";
+            show("error");
+            return;
+          }
+        } catch (err) {
+          document.getElementById("errorMsg").textContent = "Could not request permission: " + err.message;
+          show("error");
+          return;
+        }
+      } else if (typeof DeviceMotionEvent === "undefined") {
+        document.getElementById("errorMsg").textContent = "This device does not support motion sensors.";
+        show("error");
+        return;
+      }
+
+      collecting = true;
+      show("collecting");
+      window.addEventListener("devicemotion", onMotion);
+    }
+  </script>
+</body>
+</html>

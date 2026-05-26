@@ -31,6 +31,24 @@ wheels = [
 ]
 
 [[package]]
+name = "annotated-doc"
+version = "0.0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/57/ba/046ceea27344560984e26a590f90bc7f4a75b06701f653222458922b558c/annotated_doc-0.0.4.tar.gz", hash = "sha256:fbcda96e87e9c92ad167c2e53839e57503ecfda18804ea28102353485033faa4", size = 7288, upload-time = "2025-11-10T22:07:42.062Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/d3/26bf1008eb3d2daa8ef4cacc7f3bfdc11818d111f7e2d0201bc6e3b49d45/annotated_doc-0.0.4-py3-none-any.whl", hash = "sha256:571ac1dc6991c450b25a9c2d84a3705e2ae7a53467b5d111c24fa8baabbed320", size = 5303, upload-time = "2025-11-10T22:07:40.673Z" },
+]
+
+[[package]]
+name = "annotated-types"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
+]
+
+[[package]]
 name = "antlr4-python3-runtime"
 version = "4.9.3"
 source = { registry = "https://pypi.org/simple" }
@@ -75,6 +93,12 @@ dev = [
     { name = "ipykernel" },
     { name = "jupyterlab" },
 ]
+server = [
+    { name = "fastapi" },
+    { name = "jinja2" },
+    { name = "python-multipart" },
+    { name = "uvicorn" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -98,6 +122,12 @@ dev = [
     { name = "flake8", specifier = ">=6.1.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "jupyterlab", specifier = ">=4.2.5" },
+]
+server = [
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "uvicorn", specifier = ">=0.30.0" },
 ]
 
 [[package]]
@@ -2054,6 +2084,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f7/ff/3cc9165fd44106973cd7ac9facb674a65ed853494592541d339bdc9a30eb/python_json_logger-4.1.0.tar.gz", hash = "sha256:b396b9e3ed782b09ff9d6e4f1683d46c83ad0d35d2e407c09a9ebbf038f88195", size = 17573, upload-time = "2026-03-29T04:39:56.805Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/27/be/0631a861af4d1c875f096c07d34e9a63639560a717130e7a87cbc82b7e3f/python_json_logger-4.1.0-py3-none-any.whl", hash = "sha256:132994765cf75bf44554be9aa49b06ef2345d23661a96720262716438141b6b2", size = 15021, upload-time = "2026-03-29T04:39:55.266Z" },
+]
+
+[[package]]
+name = "python-multipart"
+version = "0.0.29"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/fe/70bd71a6738b09a0bdf6480ca6436b167469ca4578b2a0efbe390b4b0e70/python_multipart-0.0.29.tar.gz", hash = "sha256:643e93849196645e2dbdd81a0f8829a23123ad7f797a84a364c6fb3563f18904", size = 45678, upload-time = "2026-05-17T17:29:47.654Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/cb/769cfc37177252872a45a71f3fbdde9d51b471a3f3c14bfe95dde3407386/python_multipart-0.0.29-py3-none-any.whl", hash = "sha256:2ddcc971cef266225f54f552d8fa10bcfbb1f14446caec199060daac59ff2d69", size = 29640, upload-time = "2026-05-17T17:29:45.69Z" },
 ]
 
 [[package]]

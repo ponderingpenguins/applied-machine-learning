@@ -33,6 +33,12 @@ dependencies = [
 gait_classification = "gait_classification.main:main"
 
 [dependency-groups]
+server = [
+	"fastapi>=0.115.0",
+	"jinja2>=3.1.0",
+	"python-multipart>=0.0.9",
+	"uvicorn>=0.30.0",
+]
 dev = [
 	"black>=24.8.0",
 	"flake8>=6.1.0",

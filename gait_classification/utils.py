@@ -70,7 +70,7 @@ class TrainConfig:
     checkpoint_dir: str = "checkpoints"
 
     # Data configuration
-    data_dir: str = "../Gait-Datasets-TIFS20/Dataset #1"
+    data_dir: str = "Gait-Datasets-TIFS20/Dataset #1"
     train_dir: str = f"{data_dir}/train"
     test_dir: str = f"{data_dir}/test"
     signals_dir: str = f"{train_dir}/Inertial Signals"
