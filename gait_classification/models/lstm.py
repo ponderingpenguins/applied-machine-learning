@@ -13,13 +13,28 @@ class LSTM(nn.Module):
     input is 3D gyro and accelerometer data, output is an embedding vector.
     """
 
-    def __init__(self, input_size=6, hidden_size=128, num_layers=2, embedding_size=64):
+    def __init__(
+        self,
+        input_size=6,
+        hidden_size=128,
+        num_layers=2,
+        embedding_size=64,
+        dropout=0.1,
+    ):
         super(LSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.embedding_size = embedding_size
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.dropout_rate = dropout
+        self.lstm = nn.LSTM(
+            input_size,
+            hidden_size,
+            num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(hidden_size, embedding_size)
 
     def forward(self, x):
@@ -30,6 +45,7 @@ class LSTM(nn.Module):
         )  # lstm_out shape: (batch_size, seq_length, hidden_size)
         # Take the last time step's output
         last_output = lstm_out[:, -1, :]  # last_output shape: (batch_size, hidden_size)
+        last_output = self.dropout(last_output)
         embedding = self.fc(
             last_output
         )  # embedding shape: (batch_size, embedding_size)
@@ -57,6 +73,7 @@ class LSTM(nn.Module):
                 "input_size": self.input_size,
                 "hidden_size": self.hidden_size,
                 "num_layers": self.num_layers,
+                "dropout": self.dropout_rate,
                 "d_model": self.embedding_size,
             },
             path,

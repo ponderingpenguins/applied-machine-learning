@@ -21,13 +21,14 @@ def _load_cv_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
         with open(cv_summary_path, "r") as f:
             history = json.load(f)
         metric_key = "val_eer_mean" if "val_eer_mean" in history else "val_loss_mean"
+        metric_sem_key = "val_eer_sem" if "val_eer_sem" in history else "val_loss_sem"
         metric_std_key = "val_eer_std" if "val_eer_std" in history else "val_loss_std"
         metric_label = "EER" if metric_key == "val_eer_mean" else "Loss"
         return {
             "train_mean": np.asarray(history["train_loss_mean"], dtype=float),
             "val_mean": np.asarray(history[metric_key], dtype=float),
             "train_std": np.asarray(history.get("train_loss_std", []), dtype=float),
-            "val_std": np.asarray(history.get(metric_std_key, []), dtype=float),
+            "val_std": np.asarray(history.get(metric_sem_key, history.get(metric_std_key, [])), dtype=float),
             "metric_label": metric_label,
         }
 

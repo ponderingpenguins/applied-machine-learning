@@ -30,6 +30,7 @@ class GaitTransformer(nn.Module):
         self.num_layers = num_layers
         self.dim_feedforward = dim_feedforward
         self.embedding_size = embedding_size
+        self.dropout_rate = dropout
 
         self.input_projection = nn.Linear(input_size, d_model)
 
@@ -43,6 +44,7 @@ class GaitTransformer(nn.Module):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
+        self.dropout = nn.Dropout(dropout)
         self.embedding_head = nn.Linear(d_model, embedding_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -57,6 +59,7 @@ class GaitTransformer(nn.Module):
         x = self.encoder(x)
 
         x = x.mean(dim=1)
+        x = self.dropout(x)
 
         embedding = self.embedding_head(x)
 
@@ -86,6 +89,7 @@ class GaitTransformer(nn.Module):
                 "nhead": self.nhead,
                 "num_layers": self.num_layers,
                 "dim_feedforward": self.dim_feedforward,
+                "dropout": self.dropout_rate,
             },
             path,
         )

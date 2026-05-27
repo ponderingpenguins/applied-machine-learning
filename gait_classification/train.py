@@ -122,33 +122,52 @@ def compute_embeddings(
 
 def summarize_fold_histories(
     fold_histories: list[dict[str, list[float]]]
-) -> dict[str, list[float]]:
-    """Compute mean and std curves across fold histories."""
+) -> dict[str, object]:
+    """Compute mean, std, and SEM curves across fold histories."""
+
+    def _mean_std_sem(curves: list[np.ndarray], prefix: str) -> dict[str, list[float]]:
+        min_len = min(len(curve) for curve in curves)
+        stack = np.stack([curve[:min_len] for curve in curves], axis=0)
+        std = stack.std(axis=0)
+        sem = std / np.sqrt(stack.shape[0])
+        return {
+            f"{prefix}_mean": stack.mean(axis=0).tolist(),
+            f"{prefix}_std": std.tolist(),
+            f"{prefix}_sem": sem.tolist(),
+        }
+
     train_curves = [np.asarray(history["train_loss"], dtype=float) for history in fold_histories]
     val_loss_curves = [np.asarray(history["val_loss"], dtype=float) for history in fold_histories]
-    val_eer_curves = [np.asarray(history["val_eer"], dtype=float) for history in fold_histories if "val_eer" in history]
+    val_eer_curves = [
+        np.asarray(history["val_eer"], dtype=float)
+        for history in fold_histories
+        if "val_eer" in history and len(history["val_eer"]) > 0
+    ]
 
-    min_train_len = min(len(curve) for curve in train_curves)
-    min_val_loss_len = min(len(curve) for curve in val_loss_curves)
-
-    train_stack = np.stack([curve[:min_train_len] for curve in train_curves], axis=0)
-    val_loss_stack = np.stack([curve[:min_val_loss_len] for curve in val_loss_curves], axis=0)
-
-    summary = {
-        "train_loss_mean": train_stack.mean(axis=0).tolist(),
-        "train_loss_std": train_stack.std(axis=0).tolist(),
-        "val_loss_mean": val_loss_stack.mean(axis=0).tolist(),
-        "val_loss_std": val_loss_stack.std(axis=0).tolist(),
+    summary: dict[str, object] = {
         "n_folds": len(fold_histories),
+        **_mean_std_sem(train_curves, "train_loss"),
+        **_mean_std_sem(val_loss_curves, "val_loss"),
     }
 
     if val_eer_curves:
-        min_val_eer_len = min(len(curve) for curve in val_eer_curves)
-        val_eer_stack = np.stack([curve[:min_val_eer_len] for curve in val_eer_curves], axis=0)
+        summary.update(_mean_std_sem(val_eer_curves, "val_eer"))
+
+    best_val_eers = [
+        float(history["best_val_eer"])
+        for history in fold_histories
+        if history.get("best_val_eer") is not None
+    ]
+    if best_val_eers:
+        best_vals = np.asarray(best_val_eers, dtype=float)
+        best_std = float(best_vals.std())
+        best_sem = float(best_std / np.sqrt(len(best_vals)))
         summary.update(
             {
-                "val_eer_mean": val_eer_stack.mean(axis=0).tolist(),
-                "val_eer_std": val_eer_stack.std(axis=0).tolist(),
+                "best_val_eer_mean": float(best_vals.mean()),
+                "best_val_eer_std": best_std,
+                "best_val_eer_sem": best_sem,
+                "best_val_eer_values": best_vals.tolist(),
             }
         )
 
@@ -232,7 +251,11 @@ def train_on_split(
 
     model = construct_model(cfg, device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=cfg.learning_rate,
+        weight_decay=cfg.weight_decay,
+    )
 
     train_losses = []
     val_losses = []
@@ -372,11 +395,14 @@ def train_on_split(
                 "model_type": cfg.model_type,
                 "embedding_size": cfg.embedding_size,
                 "input_size": 6,
-                "hidden_size": 128,
-                "num_layers": 2,
-                "d_model": 64,
-                "nhead": 4,
-                "dim_feedforward": 256,
+                "lstm_hidden_size": cfg.lstm_hidden_size,
+                "lstm_num_layers": cfg.lstm_num_layers,
+                "dropout": cfg.dropout,
+                "weight_decay": cfg.weight_decay,
+                "transformer_d_model": cfg.transformer_d_model,
+                "transformer_nhead": cfg.transformer_nhead,
+                "transformer_num_layers": cfg.transformer_num_layers,
+                "transformer_dim_feedforward": cfg.transformer_dim_feedforward,
             },
             final_model_path,
         )
