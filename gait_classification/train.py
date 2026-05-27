@@ -14,6 +14,7 @@ python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filte
 
 import logging
 import os
+import copy
 import sys
 from typing import Optional
 
@@ -64,7 +65,7 @@ def _run_epoch(
     pbar = tqdm(loader, desc=f"{mode} batches", leave=False, total=total_batches)
     for windows, labels in pbar:
         windows = windows.to(device)
-        labels = torch.tensor(labels, dtype=torch.long, device=device)
+        labels = torch.as_tensor(labels, dtype=torch.long, device=device)
 
         embeddings = model(windows)
         loss, n_triplets = criterion(embeddings, labels)
@@ -124,21 +125,34 @@ def summarize_fold_histories(
 ) -> dict[str, list[float]]:
     """Compute mean and std curves across fold histories."""
     train_curves = [np.asarray(history["train_loss"], dtype=float) for history in fold_histories]
-    val_curves = [np.asarray(history["val_loss"], dtype=float) for history in fold_histories]
+    val_loss_curves = [np.asarray(history["val_loss"], dtype=float) for history in fold_histories]
+    val_eer_curves = [np.asarray(history["val_eer"], dtype=float) for history in fold_histories if "val_eer" in history]
 
     min_train_len = min(len(curve) for curve in train_curves)
-    min_val_len = min(len(curve) for curve in val_curves)
+    min_val_loss_len = min(len(curve) for curve in val_loss_curves)
 
     train_stack = np.stack([curve[:min_train_len] for curve in train_curves], axis=0)
-    val_stack = np.stack([curve[:min_val_len] for curve in val_curves], axis=0)
+    val_loss_stack = np.stack([curve[:min_val_loss_len] for curve in val_loss_curves], axis=0)
 
-    return {
+    summary = {
         "train_loss_mean": train_stack.mean(axis=0).tolist(),
         "train_loss_std": train_stack.std(axis=0).tolist(),
-        "val_loss_mean": val_stack.mean(axis=0).tolist(),
-        "val_loss_std": val_stack.std(axis=0).tolist(),
+        "val_loss_mean": val_loss_stack.mean(axis=0).tolist(),
+        "val_loss_std": val_loss_stack.std(axis=0).tolist(),
         "n_folds": len(fold_histories),
     }
+
+    if val_eer_curves:
+        min_val_eer_len = min(len(curve) for curve in val_eer_curves)
+        val_eer_stack = np.stack([curve[:min_val_eer_len] for curve in val_eer_curves], axis=0)
+        summary.update(
+            {
+                "val_eer_mean": val_eer_stack.mean(axis=0).tolist(),
+                "val_eer_std": val_eer_stack.std(axis=0).tolist(),
+            }
+        )
+
+    return summary
 
 
 
@@ -222,6 +236,15 @@ def train_on_split(
 
     train_losses = []
     val_losses = []
+    val_eers = []
+    val_fars = []
+    val_frrs = []
+    best_val_eer = float("inf")
+    best_epoch = -1
+    best_state_dict = None
+    epochs_without_improvement = 0
+    early_stopping_patience = getattr(cfg, "early_stopping_patience", 0)
+    early_stopping_min_delta = getattr(cfg, "early_stopping_min_delta", 0.0)
 
     logger.info("Starting training...")
     for epoch in tqdm(range(cfg.num_epochs), desc="Epochs"):
@@ -248,14 +271,44 @@ def train_on_split(
                     device,
                     train=False,
                 )
+                val_emb_by_pid = compute_embeddings(
+                    model, val_windows, val_labels, device, cfg.batch_size
+                )
+                val_eer, val_far, val_frr = compute_far_frr_eer(
+                    val_emb_by_pid,
+                    seed=cfg.seed,
+                    n_resamples=cfg.evaluation_resamples,
+                )
             val_losses.append(val_loss)
+            val_eers.append(val_eer)
+            val_fars.append(val_far)
+            val_frrs.append(val_frr)
+
+            if val_eer + early_stopping_min_delta < best_val_eer:
+                best_val_eer = val_eer
+                best_epoch = epoch + 1
+                best_state_dict = copy.deepcopy(model.state_dict())
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+
             logger.info(
-                "Epoch %d/%d  train_loss=%.4f  val_loss=%.4f",
+                "Epoch %d/%d  train_loss=%.4f  val_loss=%.4f  val_eer=%.2f%%  val_far=%.2f%%  val_frr=%.2f%%",
                 epoch + 1,
                 cfg.num_epochs,
                 train_loss,
                 val_loss,
+                val_eer * 100,
+                val_far * 100,
+                val_frr * 100,
             )
+
+            if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
+                logger.info(
+                    "Early stopping triggered after %d epochs without validation EER improvement.",
+                    epochs_without_improvement,
+                )
+                break
         else:
             logger.info(
                 "Epoch %d/%d  train_loss=%.4f",
@@ -263,6 +316,14 @@ def train_on_split(
                 cfg.num_epochs,
                 train_loss,
             )
+
+    if best_state_dict is not None:
+        model.load_state_dict(best_state_dict)
+        logger.info(
+            "Restored best model from epoch %d with validation EER %.2f%%",
+            best_epoch,
+            best_val_eer * 100,
+        )
 
     logger.info("Training complete. Saving history for this run...")
     import json
@@ -273,7 +334,18 @@ def train_on_split(
     )
     history_path = os.path.join(cfg.checkpoint_dir, history_fname)
     with open(history_path, "w") as f:
-        json.dump({"train_loss": train_losses, "val_loss": val_losses}, f)
+        json.dump(
+            {
+                "train_loss": train_losses,
+                "val_loss": val_losses,
+                "val_eer": val_eers,
+                "val_far": val_fars,
+                "val_frr": val_frrs,
+                "best_val_eer": best_val_eer if best_val_eer != float("inf") else None,
+                "best_epoch": best_epoch if best_epoch >= 0 else None,
+            },
+            f,
+        )
     logger.info("Training history saved to %s", history_path)
 
     if test_pids is not None and len(test_pids) > 0:
@@ -284,9 +356,10 @@ def train_on_split(
             model, test_windows, test_labels, device, cfg.batch_size
         )
 
-        eer, _, _, _ = compute_far_frr_eer(
+        eer, _, _ = compute_far_frr_eer(
             test_emb_by_pid,
             seed=cfg.seed,
+            n_resamples=cfg.evaluation_resamples,
         )
 
         logger.info("Test EER: %.2f%%", eer * 100)
@@ -312,6 +385,11 @@ def train_on_split(
     return {
         "train_loss": train_losses,
         "val_loss": val_losses,
+        "val_eer": val_eers,
+        "val_far": val_fars,
+        "val_frr": val_frrs,
+        "best_val_eer": best_val_eer if best_val_eer != float("inf") else None,
+        "best_epoch": best_epoch if best_epoch >= 0 else None,
     }
 
 
@@ -374,11 +452,19 @@ def fooberino(cfg: TrainConfig) -> None:
                 cv_summary_path,
                 cv_summary["n_folds"],
             )
-            logger.info(
-                "CV mean final losses: train=%.4f val=%.4f",
-                cv_summary["train_loss_mean"][-1],
-                cv_summary["val_loss_mean"][-1],
-            )
+            if "val_eer_mean" in cv_summary:
+                logger.info(
+                    "CV mean final metrics: train_loss=%.4f val_loss=%.4f val_eer=%.2f%%",
+                    cv_summary["train_loss_mean"][-1],
+                    cv_summary["val_loss_mean"][-1],
+                    cv_summary["val_eer_mean"][-1] * 100,
+                )
+            else:
+                logger.info(
+                    "CV mean final losses: train=%.4f val=%.4f",
+                    cv_summary["train_loss_mean"][-1],
+                    cv_summary["val_loss_mean"][-1],
+                )
 
     logger.info("Retraining final model on all development participants before one test evaluation...")
     train_on_split(
