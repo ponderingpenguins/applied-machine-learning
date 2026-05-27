@@ -1,288 +1,166 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Classify user - ${selected_label}</title>
-    <style>
-        :root {
-            color-scheme: light;
-            --bg: #f4f7fb;
-            --panel: #ffffff;
-            --ink: #132033;
-            --muted: #5e6b7e;
-            --accent: #0f766e;
-            --accent-soft: #d9f0ed;
-            --border: #d7e0ea;
-            --shadow: 0 18px 40px rgba(19, 32, 51, 0.08);
-        }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: radial-gradient(circle at top left, #e8f4ff 0, transparent 35%),
-                        linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
-            color: var(--ink);
-        }
-        .shell { max-width: 960px; margin: 0 auto; padding: 48px 24px 64px; }
-        .panel {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-        .panel__body { padding: 24px; }
-        .eyebrow {
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            font-size: 0.78rem;
-            color: var(--accent);
-            font-weight: 700;
-        }
-        h1 { margin: 10px 0 12px; font-size: clamp(2rem, 3vw, 3rem); line-height: 1.02; }
-        h2 { margin: 0 0 8px; font-size: 1.3rem; }
-        .intro { margin: 0 0 20px; color: var(--muted); max-width: 64ch; }
-        .summary {
-            margin-bottom: 20px;
-            padding: 16px;
-            border-radius: 18px;
-            background: var(--accent-soft);
-            color: #0f3d3a;
-        }
-        .summary strong { display: block; margin-bottom: 6px; }
-        .summary p { margin: 0; }
-        .button-row { display: flex; flex-wrap: wrap; gap: 12px; }
-        .button-row button,
-        .button-row a {
-            border: 0;
-            border-radius: 14px;
-            padding: 14px 18px;
-            font: inherit;
-            font-weight: 700;
-            background: var(--accent);
-            color: white;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .button-row button:hover,
-        .button-row a:hover { filter: brightness(1.03); }
-        .button-row .secondary { background: #e7edf3; color: var(--ink); }
-        .meta-links { display: grid; gap: 10px; margin-top: 18px; }
-        .meta-links a { color: var(--accent); text-decoration: none; font-weight: 700; }
+{% extends "base.html" %}
 
-        /* Recording UI states */
-        .recording-state { display: none; }
-        .recording-state.active { display: block; }
-        .recording-state.hidden { display: none; }
+{% block title %}Classify user - {{ selected_label }}{% endblock %}
 
-        /* Progress bar */
-        .progress-container {
-            margin: 20px 0;
-            background: #f0f0f0;
-            border-radius: 14px;
-            height: 8px;
-            overflow: hidden;
-        }
-        .progress-bar {
-            height: 100%;
-            background: var(--accent);
-            transition: width 0.1s linear;
-            width: 0%;
-        }
+{% block content %}
+<main class="shell">
+    <section class="panel">
+        <div class="panel__body">
+            <!-- Home state -->
+            <div id="home-state" class="recording-state active">
+                <div class="eyebrow">User classification</div>
+                <h1>Classify a user with the {{ selected_label }} model.</h1>
+                <p class="intro">Walk with your phone in your pocket for a few seconds to classify your gait.</p>
 
-        /* Result display */
-        .classification-result {
-            text-align: center;
-            padding: 24px;
-        }
-        .result-icon {
-            font-size: 3rem;
-            margin-bottom: 16px;
-        }
-        .classification-result h2 {
-            color: var(--accent);
-            margin: 16px 0;
-        }
-        .classification-result p {
-            margin: 8px 0;
-            color: var(--muted);
-        }
-
-        /* Error display */
-        .error-icon {
-            font-size: 3rem;
-            margin-bottom: 16px;
-        }
-        .error-message {
-            color: #dc2626;
-            margin: 16px 0;
-        }
-    </style>
-</head>
-<body>
-    <main class="shell">
-        <section class="panel">
-            <div class="panel__body">
-                <!-- Home state -->
-                <div id="home-state" class="recording-state active">
-                    <div class="eyebrow">User classification</div>
-                    <h1>Classify a user with the ${selected_label} model.</h1>
-                    <p class="intro">Walk with your phone in your pocket for a few seconds to classify your gait.</p>
-
-                    <div class="summary">
-                        <strong>Selected model</strong>
-                        <p>${selected_label}</p>
-                    </div>
-
-                    <div class="button-row">
-                        <button onclick="startCapture()">Start Recording</button>
-                        <a class="secondary" href="/models/${selected_model_value}">Back to model page</a>
-                    </div>
-
-                    <div class="meta-links">
-                        <a href="/models/data">View model list as JSON</a>
-                        <a href="/docs">Open API docs</a>
-                    </div>
+                <div class="summary">
+                    <strong>Selected model</strong>
+                    <p>{{ selected_label }}</p>
                 </div>
 
-                <!-- Collecting state -->
-                <div id="collecting-state" class="recording-state">
-                    <div class="eyebrow">Recording in progress</div>
-                    <h1>Walk now...</h1>
-                    <p class="intro">Collecting sensor data from your phone's motion sensors.</p>
-
-                    <div class="summary">
-                        <strong>Progress</strong>
-                        <div class="progress-container">
-                            <div id="progress-bar" class="progress-bar"></div>
-                        </div>
-                        <p id="progress-text">0 / 128 samples</p>
-                    </div>
+                <div class="button-row">
+                    <button onclick="startCapture()">Start Recording</button>
+                    <a class="secondary" href="/models/{{ selected_model_value }}">Back to model page</a>
                 </div>
 
-                <!-- Result state -->
-                <div id="result-state" class="recording-state"></div>
-
-                <!-- Error state -->
-                <div id="error-state" class="recording-state">
-                    <div class="error-icon">⚠️</div>
-                    <h2>Error</h2>
-                    <p id="error-message" class="error-message"></p>
-                    <div class="button-row">
-                        <button onclick="resetToHome()">Try Again</button>
-                        <a class="secondary" href="/models/${selected_model_value}">Back to model page</a>
-                    </div>
+                <div class="meta-links">
+                    <a href="/models/data">View model list as JSON</a>
+                    <a href="/docs">Open API docs</a>
                 </div>
             </div>
-        </section>
-    </main>
 
-    <script>
-        const TARGET = 128;
-        let samples = [];
-        let collecting = false;
+            <!-- Collecting state -->
+            <div id="collecting-state" class="recording-state">
+                <div class="eyebrow">Recording in progress</div>
+                <h1>Walk now...</h1>
+                <p class="intro">Collecting sensor data from your phone's motion sensors.</p>
 
-        function showState(stateName) {
-            ["home-state", "collecting-state", "result-state", "error-state"].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.classList.add("hidden");
-            });
-            const activeEl = document.getElementById(stateName);
-            if (activeEl) {
-                activeEl.classList.remove("hidden");
-                activeEl.classList.add("active");
-            }
+                <div class="summary">
+                    <strong>Progress</strong>
+                    <div class="progress-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                    <p id="progress-text">0 / 128 samples</p>
+                </div>
+            </div>
+
+            <!-- Result state -->
+            <div id="result-state" class="recording-state"></div>
+
+            <!-- Error state -->
+            <div id="error-state" class="recording-state">
+                <div class="error-icon">⚠️</div>
+                <h2>Error</h2>
+                <p id="error-message" class="error-message"></p>
+                <div class="button-row">
+                    <button onclick="resetToHome()">Try Again</button>
+                    <a class="secondary" href="/models/{{ selected_model_value }}">Back to model page</a>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script>
+    const TARGET = 128;
+    let samples = [];
+    let collecting = false;
+
+    function showState(stateName) {
+        ["home-state", "collecting-state", "result-state", "error-state"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add("hidden");
+        });
+        const activeEl = document.getElementById(stateName);
+        if (activeEl) {
+            activeEl.classList.remove("hidden");
+            activeEl.classList.add("active");
         }
+    }
 
-        function resetToHome() {
-            samples = [];
+    function resetToHome() {
+        samples = [];
+        collecting = false;
+        showState("home-state");
+    }
+
+    function onMotion(e) {
+        if (!collecting) return;
+        const acc = e.accelerationIncludingGravity;
+        const rot = e.rotationRate;
+        if (!acc || !rot) return;
+
+        samples.push({
+            acc_x: acc.x || 0,
+            acc_y: acc.y || 0,
+            acc_z: acc.z || 0,
+            gyr_x: rot.alpha || 0,
+            gyr_y: rot.beta || 0,
+            gyr_z: rot.gamma || 0,
+        });
+
+        const percent = Math.min(100, (samples.length / TARGET) * 100);
+        document.getElementById("progress-bar").style.width = percent + "%";
+        document.getElementById("progress-text").textContent = samples.length + " / " + TARGET + " samples";
+
+        if (samples.length >= TARGET) {
             collecting = false;
-            showState("home-state");
+            window.removeEventListener("devicemotion", onMotion);
+            sendData();
         }
+    }
 
-        function onMotion(e) {
-            if (!collecting) return;
-            const acc = e.accelerationIncludingGravity;
-            const rot = e.rotationRate;
-            if (!acc || !rot) return;
+    async function sendData() {
+        showState("collecting-state");
+        document.getElementById("progress-bar").style.width = "100%";
 
-            samples.push({
-                acc_x: acc.x || 0,
-                acc_y: acc.y || 0,
-                acc_z: acc.z || 0,
-                gyr_x: rot.alpha || 0,
-                gyr_y: rot.beta || 0,
-                gyr_z: rot.gamma || 0,
+        try {
+            const resp = await fetch("/models/{{ selected_model_value }}/classify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ samples: samples.slice(0, TARGET) }),
             });
 
-            const percent = Math.min(100, (samples.length / TARGET) * 100);
-            document.getElementById("progress-bar").style.width = percent + "%";
-            document.getElementById("progress-text").textContent = samples.length + " / " + TARGET + " samples";
-
-            if (samples.length >= TARGET) {
-                collecting = false;
-                window.removeEventListener("devicemotion", onMotion);
-                sendData();
-            }
-        }
-
-        async function sendData() {
-            showState("collecting-state");
-            document.getElementById("progress-bar").style.width = "100%";
-
-            try {
-                const resp = await fetch("/models/${selected_model_value}/classify", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ samples: samples.slice(0, TARGET) }),
-                });
-
-                if (!resp.ok) {
-                    document.getElementById("error-message").textContent = "Server error: " + resp.status;
-                    showState("error-state");
-                    return;
-                }
-
-                const html = await resp.text();
-                document.getElementById("result-state").innerHTML = html;
-                showState("result-state");
-            } catch (err) {
-                document.getElementById("error-message").textContent = "Network error: " + err.message;
-                showState("error-state");
-            }
-        }
-
-        async function startCapture() {
-            samples = [];
-
-            // iOS requires explicit permission
-            if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
-                try {
-                    const perm = await DeviceMotionEvent.requestPermission();
-                    if (perm !== "granted") {
-                        document.getElementById("error-message").textContent = "Motion permission denied.";
-                        showState("error-state");
-                        return;
-                    }
-                } catch (err) {
-                    document.getElementById("error-message").textContent = "Could not request permission: " + err.message;
-                    showState("error-state");
-                    return;
-                }
-            } else if (typeof DeviceMotionEvent === "undefined") {
-                document.getElementById("error-message").textContent = "This device does not support motion sensors.";
+            if (!resp.ok) {
+                document.getElementById("error-message").textContent = "Server error: " + resp.status;
                 showState("error-state");
                 return;
             }
 
-            collecting = true;
-            showState("collecting-state");
-            window.addEventListener("devicemotion", onMotion);
+            const html = await resp.text();
+            document.getElementById("result-state").innerHTML = html;
+            showState("result-state");
+        } catch (err) {
+            document.getElementById("error-message").textContent = "Network error: " + err.message;
+            showState("error-state");
         }
-    </script>
-</body>
-</html>
+    }
+
+    async function startCapture() {
+        samples = [];
+
+        // iOS requires explicit permission
+        if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+            try {
+                const perm = await DeviceMotionEvent.requestPermission();
+                if (perm !== "granted") {
+                    document.getElementById("error-message").textContent = "Motion permission denied.";
+                    showState("error-state");
+                    return;
+                }
+            } catch (err) {
+                document.getElementById("error-message").textContent = "Could not request permission: " + err.message;
+                showState("error-state");
+                return;
+            }
+        } else if (typeof DeviceMotionEvent === "undefined") {
+            document.getElementById("error-message").textContent = "This device does not support motion sensors.";
+            showState("error-state");
+            return;
+        }
+
+        collecting = true;
+        showState("collecting-state");
+        window.addEventListener("devicemotion", onMotion);
+    }
+</script>
+{% endblock %}

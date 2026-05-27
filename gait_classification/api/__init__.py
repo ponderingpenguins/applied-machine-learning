@@ -1,17 +1,14 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Request
 from fastapi import File, Form, UploadFile
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import torch
 import numpy as np
 import pickle
 from pathlib import Path
 
-from gait_classification.api.model_selection_page import (
-    render_classify_user_page,
-    render_model_page,
-    render_model_selection_page,
-)
 from gait_classification.models.models import construct_model
 from gait_classification.utils import ModelType, TrainConfig
 
@@ -20,6 +17,11 @@ app = FastAPI(
     description="API for encoding and classifying gait data",
     version="1.0.0",
 )
+
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+templates.env.filters["label"] = lambda m: m.value.replace("_", " ").title()
+
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 _model_cache = {}
 
@@ -80,18 +82,38 @@ class GaitData(BaseModel):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root(model_type: ModelType | None = None):
-    return render_model_selection_page(models.keys(), model_type)
+async def root(request: Request, model_type: ModelType | None = None):
+    model_options = list(models.keys())
+    selected = model_type or model_options[0]
+    return templates.TemplateResponse(
+        request,
+        name="model_selection.html",
+        context={"request": request, "model_types": model_options, "selected_model": selected}
+    )
 
 
 @app.get("/models", response_class=HTMLResponse)
-async def list_models(model_type: ModelType | None = None):
-    return render_model_selection_page(models.keys(), model_type)
+async def list_models(request: Request, model_type: ModelType | None = None):
+    model_options = list(models.keys())
+    selected = model_type or model_options[0]
+    return templates.TemplateResponse(
+        request,
+        name="model_selection.html",
+        context={"request": request, "model_types": model_options, "selected_model": selected}
+    )
 
 
 @app.get("/models/{model_type}", response_class=HTMLResponse)
-async def model_page(model_type: ModelType):
-    return render_model_page(model_type)
+async def model_page(request: Request, model_type: ModelType):
+    return templates.TemplateResponse(
+        request,
+        name="model_page.html",
+        context={
+            "request": request,
+            "selected_model_value": model_type.value,
+            "selected_label": model_type.value.replace("_", " ").title(),
+        }
+    )
 
 
 def _build_trusted_user_embedding_from_gait_data(
@@ -114,21 +136,26 @@ def _build_trusted_user_embedding_from_gait_data(
 
 
 @app.post("/models/{model_type}/encode-recording", response_class=HTMLResponse)
-async def encode_from_recording(model_type: ModelType, data: GaitData):
+async def encode_from_recording(request: Request, model_type: ModelType, data: GaitData):
     if not data.samples:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No samples provided")
 
     embedding = _build_trusted_user_embedding_from_gait_data(model_type, data)
     trusted_users[model_type].append(embedding)
 
-    return render_model_page(
-        model_type,
-        status_message=f"Trusted user enrolled from recording ({len(data.samples)} samples).",
+    return templates.TemplateResponse(
+        request,
+        name="fragments/enroll_status.html",
+        context={
+            "request": request,
+            "status_message": f"Trusted user enrolled from recording ({len(data.samples)} samples).",
+        }
     )
 
 
 @app.post("/models/{model_type}/encode", response_class=HTMLResponse)
 async def encode_from_file(
+    request: Request,
     model_type: ModelType,
     trusted_user_file: UploadFile | None = File(default=None),
 ):
@@ -164,14 +191,26 @@ async def encode_from_file(
     trusted_users[model_type].append(embedding)
 
     filename = trusted_user_file.filename or "uploaded file"
-    return render_model_page(
-        model_type,
-        status_message=f"Trusted user enrolled from {filename} ({len(samples)} samples).",
+    return templates.TemplateResponse(
+        request,
+        name="fragments/enroll_status.html",
+        context={
+            "request": request,
+            "status_message": f"Trusted user enrolled from {filename} ({len(samples)} samples).",
+        }
     )
 
 @app.get("/models/{model_type}/classify", response_class=HTMLResponse)
-async def model_classify_page(model_type: ModelType):
-    return render_classify_user_page(model_type)
+async def model_classify_page(request: Request, model_type: ModelType):
+    return templates.TemplateResponse(
+        request,
+        name="classify_user.html",
+        context={
+            "request": request,
+            "selected_model_value": model_type.value,
+            "selected_label": model_type.value.replace("_", " ").title(),
+        }
+    )
 
 
 @app.post("/models/{model_type}/classify", response_class=HTMLResponse)
