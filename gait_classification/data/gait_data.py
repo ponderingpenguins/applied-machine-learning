@@ -287,7 +287,11 @@ class GaitWindowDataset(Dataset):
             labels: Array of shape (N,) with participant IDs.
         """
         self.windows = torch.tensor(windows, dtype=torch.float32)
-        self.labels = labels
+        
+        if not isinstance(labels, torch.Tensor):
+            self.labels = torch.tensor(labels, dtype=torch.long)
+        else:
+            self.labels = labels.long()
 
     def __len__(self) -> int:
         return len(self.labels)
