@@ -45,6 +45,11 @@ class TrainConfig:
     batch_size: int = 32
     num_epochs: int = 10
     learning_rate: float = 0.001
+    weight_decay: float = 1e-4
+    dropout: float = 0.1
+    early_stopping_patience: int = 0
+    early_stopping_min_delta: float = 0.0
+    evaluation_resamples: int = 10
 
     model_type: str = "lstm"
 
@@ -62,6 +67,14 @@ class TrainConfig:
     embedding_size: int = 64
     triplet_margin: float = 0.3
 
+    # Model-specific architecture hyperparameters.
+    lstm_hidden_size: int = 128
+    lstm_num_layers: int = 2
+    transformer_d_model: int = 64
+    transformer_nhead: int = 4
+    transformer_num_layers: int = 2
+    transformer_dim_feedforward: int = 256
+
     train_split: float = 0.70
     val_split: float = 0.15
 
@@ -70,7 +83,7 @@ class TrainConfig:
     checkpoint_dir: str = "checkpoints"
 
     # Data configuration
-    data_dir: str = "../Gait-Datasets-TIFS20/Dataset #1"
+    data_dir: str = "./Gait-Datasets-TIFS20/Dataset #1"
     train_dir: str = f"{data_dir}/train"
     test_dir: str = f"{data_dir}/test"
     signals_dir: str = f"{train_dir}/Inertial Signals"
