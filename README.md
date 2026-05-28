@@ -24,3 +24,21 @@ Then, create a virtual environment and install the dependencies:
 ```bash
 uv sync
 ```
+
+## Training and finetuning
+
+Train a baseline model with:
+
+```bash
+python -m gait_classification.train model_type=lstm
+python -m gait_classification.train model_type=transformer
+```
+
+Run the iterative hyperparameter search with SEM-based comparisons using:
+
+```bash
+python -m gait_classification.finetune model_type=lstm
+python -m gait_classification.finetune model_type=transformer
+```
+
+The finetuning run saves a compact summary and per-stage plots in `checkpoints/finetuning/`.

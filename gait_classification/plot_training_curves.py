@@ -20,11 +20,16 @@ def _load_cv_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
     if os.path.exists(cv_summary_path):
         with open(cv_summary_path, "r") as f:
             history = json.load(f)
+        metric_key = "val_eer_mean" if "val_eer_mean" in history else "val_loss_mean"
+        metric_sem_key = "val_eer_sem" if "val_eer_sem" in history else "val_loss_sem"
+        metric_std_key = "val_eer_std" if "val_eer_std" in history else "val_loss_std"
+        metric_label = "EER" if metric_key == "val_eer_mean" else "Loss"
         return {
             "train_mean": np.asarray(history["train_loss_mean"], dtype=float),
-            "val_mean": np.asarray(history["val_loss_mean"], dtype=float),
+            "val_mean": np.asarray(history[metric_key], dtype=float),
             "train_std": np.asarray(history.get("train_loss_std", []), dtype=float),
-            "val_std": np.asarray(history.get("val_loss_std", []), dtype=float),
+            "val_std": np.asarray(history.get(metric_sem_key, history.get(metric_std_key, [])), dtype=float),
+            "metric_label": metric_label,
         }
 
     if fold_paths:
@@ -34,7 +39,12 @@ def _load_cv_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
                 histories.append(json.load(f))
 
         train_curves = [np.asarray(history["train_loss"], dtype=float) for history in histories]
-        val_curves = [np.asarray(history["val_loss"], dtype=float) for history in histories]
+        if all("val_eer" in history for history in histories):
+            val_curves = [np.asarray(history["val_eer"], dtype=float) for history in histories]
+            metric_label = "EER"
+        else:
+            val_curves = [np.asarray(history["val_loss"], dtype=float) for history in histories]
+            metric_label = "Loss"
         min_train_len = min(len(curve) for curve in train_curves)
         min_val_len = min(len(curve) for curve in val_curves)
         train_stack = np.stack([curve[:min_train_len] for curve in train_curves], axis=0)
@@ -44,6 +54,7 @@ def _load_cv_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
             "val_mean": val_stack.mean(axis=0),
             "train_std": train_stack.std(axis=0),
             "val_std": val_stack.std(axis=0),
+            "metric_label": metric_label,
         }
 
     return None
@@ -60,6 +71,7 @@ def _load_final_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
     return {
         "train_loss": np.asarray(history.get("train_loss", []), dtype=float),
         "val_loss": np.asarray(history.get("val_loss", []), dtype=float),
+        "val_eer": np.asarray(history.get("val_eer", []), dtype=float),
     }
 
 
@@ -84,12 +96,14 @@ def plot_training_curves(
         val_mean = cv_history["val_mean"]
         train_std = cv_history["train_std"]
         val_std = cv_history["val_std"]
+        metric_label = cv_history.get("metric_label", "Loss")
         epochs = np.arange(1, len(train_mean) + 1)
     else:
         train_mean = final_history["train_loss"]
-        val_mean = final_history["val_loss"]
+        val_mean = final_history["val_eer"] if len(final_history["val_eer"]) > 0 else final_history["val_loss"]
         train_std = np.array([])
         val_std = np.array([])
+        metric_label = "EER" if len(final_history["val_eer"]) > 0 else "Loss"
         epochs = np.arange(1, len(train_mean) + 1)
 
     plt.figure(figsize=(10, 6))
@@ -106,7 +120,7 @@ def plot_training_curves(
         epochs,
         val_mean,
         "r-",
-        label="Val Loss (mean)",
+        label=f"Val {metric_label} (mean)",
         linewidth=2,
         marker="s",
         markersize=4,
@@ -127,10 +141,10 @@ def plot_training_curves(
         final_epochs = np.arange(1, len(final_history["val_loss"]) + 1)
         plt.plot(
             final_epochs,
-            final_history["val_loss"],
+            final_history["val_eer"] if len(final_history["val_eer"]) > 0 else final_history["val_loss"],
             color="darkred",
             linestyle="--",
-            label="Val Loss (final)",
+            label=f"Val {metric_label} (final)",
             linewidth=1.8,
             alpha=0.9,
         )
@@ -155,7 +169,7 @@ def plot_training_curves(
         )
 
     plt.xlabel("Epoch", fontsize=12)
-    plt.ylabel("Loss", fontsize=12)
+    plt.ylabel(metric_label, fontsize=12)
     plt.title("Cross-Validation Mean and Final Training Curves", fontsize=14, fontweight="bold")
     plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3)
