@@ -1,14 +1,8 @@
-"""Iterative hyperparameter finetuning for gait classification.
-
-This code follows the lecture suggestions:
-- tune one parameter at a time;
-- compare only the primary metric (for use that is validation EER);
-- use SEM instead of std for the decision rule;
-- keep the search spaces small and sensible.
-"""
+"""Grid search hyperparameter finetuning for gait classification."""
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import os
@@ -17,7 +11,6 @@ import tempfile
 from dataclasses import replace
 from typing import Any
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from omegaconf import OmegaConf
@@ -54,64 +47,15 @@ def _get_primary_metric(summary: dict[str, Any]) -> tuple[float, float]:
 	return float(summary["best_val_eer_mean"]), float(summary["best_val_eer_sem"])
 
 
-def _compare_against_baseline(
-	baseline_mean: float,
-	baseline_sem: float,
-	candidate_mean: float,
-	candidate_sem: float,
-) -> tuple[bool, float, float]:
-	"""Return whether the candidate is a real improvement over the baseline."""
-
-	delta = baseline_mean - candidate_mean
-	combined_sem = float(np.sqrt(baseline_sem**2 + candidate_sem**2))
-	threshold = 2.0 * combined_sem
-	return delta > threshold, delta, threshold
+def _combined_sem_threshold(best_sem: float, candidate_sem: float) -> float:
+	return float(2.0 * np.sqrt(best_sem**2 + candidate_sem**2))
 
 
-def _plot_stage_results(
-	stage_name: str,
-	baseline_mean: float,
-	baseline_sem: float,
-	stage_results: list[dict[str, Any]],
-	output_dir: str,
-) -> str:
-	os.makedirs(output_dir, exist_ok=True)
-
-	labels = [result["label"] for result in stage_results]
-	means = np.asarray([result["mean"] for result in stage_results], dtype=float)
-	sems = np.asarray([result["sem"] for result in stage_results], dtype=float)
-
-	x = np.arange(len(labels))
-	plt.figure(figsize=(max(7, 1.4 * len(labels)), 4.8))
-	plt.errorbar(
-		x,
-		means,
-		yerr=sems,
-		fmt="o",
-		color="tab:blue",
-		capsize=5,
-		linewidth=2,
-		label="candidate mean ± SEM",
-	)
-	plt.axhline(
-		baseline_mean,
-		color="tab:gray",
-		linestyle="--",
-		linewidth=2,
-		label=f"baseline = {baseline_mean:.4f} ± {baseline_sem:.4f}",
-	)
-	plt.xticks(x, labels, rotation=20, ha="right")
-	plt.ylabel("Validation EER")
-	plt.xlabel(stage_name)
-	plt.title(f"Finetuning stage: {stage_name}")
-	plt.grid(True, axis="y", alpha=0.25)
-	plt.legend()
-	plt.tight_layout()
-
-	output_path = os.path.join(output_dir, f"{stage_name}.png")
-	plt.savefig(output_path, dpi=300)
-	plt.close()
-	return output_path
+def _merge_candidate_updates(*updates: CandidateUpdate) -> CandidateUpdate:
+	merged: CandidateUpdate = {}
+	for update in updates:
+		merged.update(update)
+	return merged
 
 
 def _evaluate_config(
@@ -156,280 +100,220 @@ def _evaluate_config(
 
 
 def _candidate_label(updates: CandidateUpdate) -> str:
-	return ", ".join(f"{key}={value}" for key, value in updates.items())
+	return ", ".join(f"{key}={value}" for key, value in sorted(updates.items()))
 
 
-def _tuning_plan(cfg: TrainConfig) -> list[tuple[str, list[CandidateUpdate]]]:
-	shared_stages: list[tuple[str, list[CandidateUpdate]]] = [
-		(
-			"learning_rate",
-			[
-				{"learning_rate": 1e-4},
-				{"learning_rate": 5e-4},
-				{"learning_rate": 1e-3},
-				{"learning_rate": 5e-3},
-			],
-		),
-		(
-			"triplet_margin",
-			[
-				{"triplet_margin": 0.2},
-				{"triplet_margin": 0.3},
-				{"triplet_margin": 0.4},
-				{"triplet_margin": 0.5},
-			],
-		),
-		(
-			"embedding_size",
-			[
-				{"embedding_size": 32},
-				{"embedding_size": 64},
-				{"embedding_size": 128},
-			],
-		),
-		(
-			"weight_decay",
-			[
-				{"weight_decay": 1e-5},
-				{"weight_decay": 1e-4},
-				{"weight_decay": 5e-4},
-			],
-		),
-		(
-			"dropout",
-			[
-				{"dropout": 0.05},
-				{"dropout": 0.1},
-				{"dropout": 0.2},
-			],
-		),
+def _candidate_complexity(updates: CandidateUpdate) -> float:
+	"""Return a rough proxy for model cost so simpler candidates sort first."""
+
+	architecture_terms = {
+		"embedding_size": 1.0,
+		"lstm_hidden_size": 1.0,
+		"lstm_num_layers": 32.0,
+		"transformer_d_model": 1.0,
+		"transformer_nhead": 4.0,
+		"transformer_dim_feedforward": 0.25,
+		"transformer_num_layers": 32.0,
+	}
+	return float(sum(float(updates[key]) * weight for key, weight in architecture_terms.items() if key in updates))
+
+
+def _build_grid(cfg: TrainConfig) -> list[CandidateUpdate]:
+	"""Build a flat list of candidate configurations to evaluate."""
+
+	grid_dimensions: list[list[CandidateUpdate]] = [
+		[{"learning_rate": value} for value in [1e-4, 5e-4, 1e-3, 5e-3]],
+		[{"weight_decay": value} for value in [1e-5, 1e-4, 5e-4]],
+		[{"dropout": value} for value in [0.05, 0.1, 0.2]],
+		[{"embedding_size": value} for value in [32, 64, 128]],
 	]
 
 	loss_type = LossType(cfg.loss_type)
 	if loss_type == LossType.TRIPLET:
-		shared_stages.append(
-			(
-				"triplet_margin",
-				[
-					{"triplet_margin": 0.2},
-					{"triplet_margin": 0.3},
-					{"triplet_margin": 0.4},
-					{"triplet_margin": 0.5},
-				],
-			)
-		)
+		grid_dimensions.append([{"triplet_margin": value} for value in [0.2, 0.3, 0.4, 0.5]])
 	elif loss_type == LossType.COSFACE:
-		shared_stages.extend(
+		grid_dimensions.extend(
 			[
-				(
-					"cosface_margin",
-					[
-						{"cosface_margin": 0.2},
-						{"cosface_margin": 0.35},
-						{"cosface_margin": 0.5},
-					],
-				),
-				(
-					"cosface_scale",
-					[
-						{"cosface_scale": 16.0},
-						{"cosface_scale": 30.0},
-						{"cosface_scale": 64.0},
-					],
-				),
+				[{"cosface_margin": value} for value in [0.2, 0.3, 0.4, 0.5]],
+				[{"cosface_scale": value} for value in [8.0, 16.0, 24.0, 30.0]],
 			]
 		)
 	else:
 		raise ValueError(f"Unknown loss type for finetuning: {cfg.loss_type}")
 
-	if cfg.model_type == ModelType.LSTM or cfg.model_type == ModelType.LSTM.value:
-		shared_stages.extend(
+	model_type = ModelType(cfg.model_type)
+	if model_type == ModelType.LSTM:
+		grid_dimensions.extend(
 			[
-				(
-					"lstm_hidden_size",
-					[
-						{"lstm_hidden_size": 64},
-						{"lstm_hidden_size": 128},
-						{"lstm_hidden_size": 256},
-					],
-				),
-				(
-					"lstm_num_layers",
-					[
-						{"lstm_num_layers": 1},
-						{"lstm_num_layers": 2},
-						{"lstm_num_layers": 3},
-					],
-				),
+				[{"lstm_hidden_size": value} for value in [64, 128]],
+				[{"lstm_num_layers": value} for value in [1, 2, 3]],
 			]
 		)
-	elif cfg.model_type == ModelType.TRANSFORMER or cfg.model_type == ModelType.TRANSFORMER.value:
-		shared_stages.extend(
+	elif model_type == ModelType.TRANSFORMER:
+		grid_dimensions.extend(
 			[
-				(
-					"transformer_width",
-					[
-						{"transformer_d_model": 32, "transformer_nhead": 2},
-						{"transformer_d_model": 64, "transformer_nhead": 4},
-						{"transformer_d_model": 128, "transformer_nhead": 8},
-					],
-				),
-				(
-					"transformer_dim_feedforward",
-					[
-						{"transformer_dim_feedforward": 128},
-						{"transformer_dim_feedforward": 256},
-						{"transformer_dim_feedforward": 512},
-					],
-				),
-				(
-					"transformer_num_layers",
-					[
-						{"transformer_num_layers": 2},
-						{"transformer_num_layers": 4},
-						{"transformer_num_layers": 6},
-					],
-				),
+				[
+					{"transformer_d_model": 32, "transformer_nhead": 2},
+					{"transformer_d_model": 64, "transformer_nhead": 4},
+					{"transformer_d_model": 128, "transformer_nhead": 8},
+				],
+				[{"transformer_dim_feedforward": value} for value in [128, 256, 512]],
+				[{"transformer_num_layers": value} for value in [2, 4, 6]],
 			]
 		)
 	else:
 		raise ValueError(f"Unknown model type for finetuning: {cfg.model_type}")
 
-	return shared_stages
+	return [
+		_merge_candidate_updates(*dimension_updates)
+		for dimension_updates in itertools.product(*grid_dimensions)
+	]
+
+
+def _evaluate_grid_results(results: list[dict[str, Any]]) -> dict[str, Any]:
+	"""Rank the grid search outputs and identify the statistically tied top tier."""
+
+	if not results:
+		raise ValueError("Grid search produced no results.")
+
+	sorted_results = sorted(
+		results,
+		key=lambda result: (
+			result["mean"],
+			result["sem"],
+			_candidate_complexity(result["params"]),
+			_candidate_label(result["params"]),
+		),
+	)
+	best = sorted_results[0]
+	best_mean = float(best["mean"])
+	best_sem = float(best["sem"])
+
+	top_tier: list[dict[str, Any]] = []
+	for result in sorted_results:
+		threshold = _combined_sem_threshold(best_sem, float(result["sem"]))
+		delta = float(result["mean"]) - best_mean
+		result["delta_from_best"] = delta
+		result["threshold"] = threshold
+		result["within_best_threshold"] = delta <= threshold
+		result["complexity"] = _candidate_complexity(result["params"])
+		if result["within_best_threshold"]:
+			top_tier.append(result)
+
+	top_tier.sort(key=lambda result: (result["complexity"], result["mean"], result["sem"], result["label"]))
+
+	return {
+		"absolute_best": best,
+		"top_tier": top_tier,
+		"sorted_results": sorted_results,
+	}
 
 
 def _run_finetuning(cfg: TrainConfig) -> dict[str, Any]:
-	logger.info("Finetuning with config: %s", cfg)
+	logger.info("Grid-search finetuning with config: %s", cfg)
 
 	preprocess_functions = construct_filters(cfg)
 	raw, y = load_and_preprocess_data(cfg, preprocess_functions=preprocess_functions)
 	windows, labels = build_windowed_data(cfg, raw, y)
-	logger.info("Loaded %d windows for finetuning", len(windows))
+	logger.info("Loaded %d windows for grid search", len(windows))
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	device = torch.device("mps" if torch.backends.mps.is_available() else device)
 	logger.info("Using device: %s", device)
 
-	current_cfg = cfg
-	current_eval = _evaluate_config(current_cfg, windows, labels, device)
-	current_mean = current_eval["primary_mean"]
-	current_sem = current_eval["primary_sem"]
-
 	output_dir = os.path.join(cfg.checkpoint_dir, "finetuning")
 	os.makedirs(output_dir, exist_ok=True)
 
-	stage_reports: list[dict[str, Any]] = []
-	for stage_name, candidates in _tuning_plan(cfg):
-		baseline_mean = current_mean
-		baseline_sem = current_sem
-		logger.info(
-			"Stage %s: baseline best_val_eer=%.4f ± %.4f",
-			stage_name,
-			baseline_mean,
-			baseline_sem,
+	candidates = _build_grid(cfg)
+	logger.info("Evaluating %d grid combinations", len(candidates))
+
+	results: list[dict[str, Any]] = []
+	for index, candidate_updates in enumerate(candidates, start=1):
+		candidate_cfg = _clone_cfg(cfg, **candidate_updates)
+		logger.info("Evaluating %d/%d: %s", index, len(candidates), _candidate_label(candidate_updates))
+		candidate_eval = _evaluate_config(candidate_cfg, windows, labels, device)
+		candidate_mean = candidate_eval["primary_mean"]
+		candidate_sem = candidate_eval["primary_sem"]
+		results.append(
+			{
+				"params": candidate_updates,
+				"label": _candidate_label(candidate_updates),
+				"mean": candidate_mean,
+				"sem": candidate_sem,
+			}
 		)
+		logger.info("  result: best_val_eer=%.4f ± %.4f", candidate_mean, candidate_sem)
 
-		stage_results: list[dict[str, Any]] = []
-		for candidate_updates in candidates:
-			candidate_cfg = _clone_cfg(current_cfg, **candidate_updates)
-			candidate_eval = _evaluate_config(candidate_cfg, windows, labels, device)
-			candidate_mean = candidate_eval["primary_mean"]
-			candidate_sem = candidate_eval["primary_sem"]
-			accepted, delta, threshold = _compare_against_baseline(
-				baseline_mean,
-				baseline_sem,
-				candidate_mean,
-				candidate_sem,
-			)
+	analysis = _evaluate_grid_results(results)
+	absolute_best = analysis["absolute_best"]
+	top_tier = analysis["top_tier"]
+	sorted_results = analysis["sorted_results"]
 
-			stage_results.append(
-				{
-					"label": _candidate_label(candidate_updates),
-					"updates": candidate_updates,
-					"mean": candidate_mean,
-					"sem": candidate_sem,
-					"delta": delta,
-					"threshold": threshold,
-					"accepted": accepted,
-				}
-			)
+	logger.info("Grid search complete")
+	logger.info(
+		"Absolute best: best_val_eer=%.4f ± %.4f with %s",
+		absolute_best["mean"],
+		absolute_best["sem"],
+		absolute_best["label"],
+	)
+	logger.info("Top-tier configurations: %d", len(top_tier))
 
-			logger.info(
-				"  %s -> best_val_eer=%.4f ± %.4f | delta=%.4f | 2xSEM=%.4f | %s",
-				_candidate_label(candidate_updates),
-				candidate_mean,
-				candidate_sem,
-				delta,
-				threshold,
-				"accept" if accepted else "reject",
-			)
-
-		accepted_candidates = [result for result in stage_results if result["accepted"]]
-		if accepted_candidates:
-			chosen = min(accepted_candidates, key=lambda result: result["mean"])
-			current_cfg = _clone_cfg(current_cfg, **chosen["updates"])
-			current_mean = chosen["mean"]
-			current_sem = chosen["sem"]
-			stage_decision = "accepted"
-		else:
-			chosen = None
-			stage_decision = "kept baseline"
-
-		plot_path = _plot_stage_results(
-			stage_name,
-			baseline_mean,
-			baseline_sem,
-			stage_results,
-			output_dir,
-		)
-		stage_report = {
-			"stage": stage_name,
-			"baseline_mean": baseline_mean,
-			"baseline_sem": baseline_sem,
-			"results": stage_results,
-			"decision": stage_decision,
-			"chosen": chosen,
-			"plot_path": plot_path,
-		}
-		stage_reports.append(stage_report)
-
-		if chosen is not None:
-			current_eval = {"primary_mean": current_mean, "primary_sem": current_sem}
-		else:
-			current_eval = {"primary_mean": baseline_mean, "primary_sem": baseline_sem}
-
+	best_config = _clone_cfg(cfg, **absolute_best["params"])
 	final_summary = {
 		"model_type": cfg.model_type,
 		"primary_metric": "best_val_eer",
-		"final_best_val_eer_mean": current_mean,
-		"final_best_val_eer_sem": current_sem,
-		"best_config": current_cfg.__dict__,
-		"stages": stage_reports,
+		"grid_size": len(candidates),
+		"best_result": {
+			"label": absolute_best["label"],
+			"params": absolute_best["params"],
+			"mean": absolute_best["mean"],
+			"sem": absolute_best["sem"],
+		},
+		"top_tier": [
+			{
+				"label": result["label"],
+				"params": result["params"],
+				"mean": result["mean"],
+				"sem": result["sem"],
+				"complexity": result["complexity"],
+				"delta_from_best": result["delta_from_best"],
+				"threshold": result["threshold"],
+			}
+			for result in top_tier
+		],
+		"sorted_results": [
+			{
+				"label": result["label"],
+				"params": result["params"],
+				"mean": result["mean"],
+				"sem": result["sem"],
+				"complexity": result["complexity"],
+				"delta_from_best": result["delta_from_best"],
+				"threshold": result["threshold"],
+				"within_best_threshold": result["within_best_threshold"],
+			}
+			for result in sorted_results
+		],
+		"best_config": best_config.__dict__,
 	}
 
-	summary_path = os.path.join(output_dir, "finetune_summary.json")
+	summary_path = os.path.join(output_dir, "grid_search_results.json")
 	with open(summary_path, "w") as f:
 		json.dump(final_summary, f, indent=2)
-	logger.info("Saved finetuning summary to %s", summary_path)
-	logger.info(
-		"Final selected config best_val_eer=%.4f ± %.4f",
-		current_mean,
-		current_sem,
-	)
+	logger.info("Saved grid search results to %s", summary_path)
 
 	return final_summary
 
 
 def main() -> None:
-	"""main function"""
+	"""Main entry point."""
 	cfg = OmegaConf.structured(TrainConfig)
 	cli_cfg = OmegaConf.from_cli()
 	cfg = OmegaConf.merge(cfg, cli_cfg)
-	cfg = OmegaConf.to_container(cfg, resolve=True)
 	try:
-		cfg = TrainConfig(**cfg)
+		cfg = TrainConfig(**OmegaConf.to_container(cfg, resolve=True))
 	except TypeError as e:  # pylint: disable=broad-exception-raised
-		logger.error("Error: %s\n\nUsage: python finetune.py", e)
+		logger.error("Config error: %s\n\nUsage: python gait_classification/finetune.py", e)
 		sys.exit(1)
 
 	_run_finetuning(cfg)
