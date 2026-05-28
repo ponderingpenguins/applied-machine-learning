@@ -233,8 +233,6 @@ def train_on_split(
         (windows_scaled[test_mask], labels[test_mask]) if test_mask is not None else (None, None)
     )
 
-    val_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
-    
     if cfg.loss_type == LossType.COSFACE:
         logger.info("Using CosFace loss for training.")
         # Map training PIDs to 0-indexed classes
@@ -261,6 +259,8 @@ def train_on_split(
         model = construct_model(cfg, device)
         train_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
 
+    val_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
+
     train_labels = train_ds.labels.numpy()
     class_counts = np.bincount(train_labels)
     weights = 1.0 / class_counts[train_labels]
@@ -284,8 +284,6 @@ def train_on_split(
         )
         if val_ds else None
     )
-
-    model = construct_model(cfg, device)
 
     optimizer = torch.optim.Adam(
         model.parameters(),
@@ -330,7 +328,7 @@ def train_on_split(
                     None,
                     device,
                     train=False,
-                    loss_type=LossType.TRIPLET  # Always use triplet loss for validation
+                    loss_type=LossType.TRIPLET,
                 )
                 val_emb_by_pid = compute_embeddings(
                     model, val_windows, val_labels, device, cfg.batch_size

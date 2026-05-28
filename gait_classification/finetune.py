@@ -30,8 +30,7 @@ from gait_classification.data.gait_data import (
 	participant_split,
 )
 from gait_classification.train import summarize_fold_histories, train_on_split
-from gait_classification.triplet_loss import OnlineTripletLoss
-from gait_classification.utils import ModelType, TrainConfig
+from gait_classification.utils import LossType, ModelType, TrainConfig
 
 logging.basicConfig(
 	level=logging.INFO,
@@ -128,7 +127,6 @@ def _evaluate_config(
 	train_pids, val_pids, _ = participant_split(participants, cfg)
 	development_pids = np.concatenate([train_pids, val_pids])
 	folds = make_kfold_splits(development_pids, cfg)
-	criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
 
 	fold_histories: list[dict[str, list[float]]] = []
 	with tempfile.TemporaryDirectory(prefix="gait_finetune_") as temp_dir:
@@ -143,7 +141,6 @@ def _evaluate_config(
 				val_pids=val_fold_pids,
 				test_pids=None,
 				device=device,
-				criterion=criterion,
 				fold_idx=fold_idx,
 				save_model=False,
 			)
@@ -207,6 +204,43 @@ def _tuning_plan(cfg: TrainConfig) -> list[tuple[str, list[CandidateUpdate]]]:
 			],
 		),
 	]
+
+	loss_type = LossType(cfg.loss_type)
+	if loss_type == LossType.TRIPLET:
+		shared_stages.append(
+			(
+				"triplet_margin",
+				[
+					{"triplet_margin": 0.2},
+					{"triplet_margin": 0.3},
+					{"triplet_margin": 0.4},
+					{"triplet_margin": 0.5},
+				],
+			)
+		)
+	elif loss_type == LossType.COSFACE:
+		shared_stages.extend(
+			[
+				(
+					"cosface_margin",
+					[
+						{"cosface_margin": 0.2},
+						{"cosface_margin": 0.35},
+						{"cosface_margin": 0.5},
+					],
+				),
+				(
+					"cosface_scale",
+					[
+						{"cosface_scale": 16.0},
+						{"cosface_scale": 30.0},
+						{"cosface_scale": 64.0},
+					],
+				),
+			]
+		)
+	else:
+		raise ValueError(f"Unknown loss type for finetuning: {cfg.loss_type}")
 
 	if cfg.model_type == ModelType.LSTM or cfg.model_type == ModelType.LSTM.value:
 		shared_stages.extend(
