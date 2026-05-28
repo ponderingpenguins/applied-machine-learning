@@ -10,6 +10,11 @@ class ModelType(StrEnum):
     LSTM = "lstm"
     TRANSFORMER = "transformer"
 
+class LossType(StrEnum):
+    """Loss function types"""
+    TRIPLET = "triplet"
+    COSFACE = "cosface"
+
 
 @dataclass
 class TrainConfig:
@@ -52,6 +57,7 @@ class TrainConfig:
     evaluation_resamples: int = 10
 
     model_type: str = "lstm"
+    loss_type: str = "triplet"
 
     seed: int = 67  # Six seven...
     fft_threshold: float = 0.95  # Chosen in the preliminary data look notebook by plotting the t-sne of the FFT features to see which threshold gives the best separation.
@@ -66,7 +72,9 @@ class TrainConfig:
     window_stride: int = 128
     embedding_size: int = 64
     triplet_margin: float = 0.3
-
+    cosface_margin: float = 0.35
+    cosface_scale: float = 30.0
+      
     # Model-specific architecture hyperparameters.
     lstm_hidden_size: int = 128
     lstm_num_layers: int = 2

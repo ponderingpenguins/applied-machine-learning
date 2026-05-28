@@ -19,6 +19,7 @@ import sys
 from typing import Optional
 
 import numpy as np
+from gait_classification.models.cosface_head import CosFaceHead
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
@@ -38,7 +39,8 @@ from gait_classification.data.gait_data import (
 from gait_classification.eval import compute_far_frr_eer
 from gait_classification.models.models import construct_model
 from gait_classification.triplet_loss import OnlineTripletLoss
-from gait_classification.utils import TrainConfig
+from gait_classification.cosface_loss import CosFaceLoss
+from gait_classification.utils import LossType, TrainConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,10 +53,11 @@ logger = logging.getLogger(__name__)
 def _run_epoch(
     model: nn.Module,
     loader: DataLoader,
-    criterion: OnlineTripletLoss,
+    criterion: nn.Module,
     optimizer=None,
     device: torch.device = None,
     train: bool = False,
+    loss_type: str = LossType.TRIPLET
 ) -> float:
     """Run a single epoch with online semi-hard triplet mining."""
     total_loss = 0.0
@@ -65,13 +68,23 @@ def _run_epoch(
     pbar = tqdm(loader, desc=f"{mode} batches", leave=False, total=total_batches)
     for windows, labels in pbar:
         windows = windows.to(device)
-        labels = torch.as_tensor(labels, dtype=torch.long, device=device)
+        labels = labels.to(device)
 
-        embeddings = model(windows)
-        loss, n_triplets = criterion(embeddings, labels)
-
-        if loss is None:
-            continue
+        if loss_type == LossType.COSFACE:
+            # For CosFace, the model returns logits and labels must be long
+            logits = model(windows)
+            loss = criterion(logits, labels)
+        else: # Triplet Loss
+            # For Triplet, we get embeddings. If it's a CosFaceHead model (in validation),
+            # we need to call get_embeddings()
+            if isinstance(model, CosFaceHead):
+                embeddings = model.get_embeddings(windows)
+            else:
+                embeddings = model(windows)
+            
+            loss, n_triplets = criterion(embeddings, labels.long())
+            if n_triplets == 0:
+                continue
 
         if train:
             optimizer.zero_grad()
@@ -104,10 +117,14 @@ def compute_embeddings(
         windows_tensor, batch_size=batch_size, shuffle=False, num_workers=0
     )
 
+    embeddings_list = []
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
-            emb = model(batch)
+            if isinstance(model, CosFaceHead):
+                emb = model.get_embeddings(batch)
+            else:
+                emb = model(batch)
             embeddings_list.append(emb.cpu().numpy())
 
     embeddings = np.concatenate(embeddings_list, axis=0)
@@ -187,11 +204,10 @@ def train_on_split(
     val_pids=None,
     test_pids=None,
     device: torch.device = None,
-    criterion: OnlineTripletLoss = None,
     fold_idx: Optional[int] = None,
     save_model: bool = False,
 ):
-    """Train/evaluate on a single participant split."""
+    """Train/evaluate on a single participant split, supporting multiple loss functions."""
 
     split_msg = "Train participants: %d, Val participants: %d" % (
         len(train_pids),
@@ -217,14 +233,35 @@ def train_on_split(
         (windows_scaled[test_mask], labels[test_mask]) if test_mask is not None else (None, None)
     )
 
-    logger.info(
-        "Train windows: %d, Val windows: %d%s",
-        len(train_windows),
-        len(val_windows) if val_windows is not None else 0,
-        ", Test windows: %d" % len(test_windows) if test_windows is not None else "",
-    )
+    val_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
+    
+    if cfg.loss_type == LossType.COSFACE:
+        logger.info("Using CosFace loss for training.")
+        # Map training PIDs to 0-indexed classes
+        unique_train_pids = sorted(np.unique(train_pids))
+        pid_to_class_idx = {pid: i for i, pid in enumerate(unique_train_pids)}
+        
+        train_labels_mapped = torch.tensor([pid_to_class_idx[pid] for pid in train_labels])
 
-    train_ds = GaitWindowDataset(train_windows, train_labels)
+        train_ds = GaitWindowDataset(train_windows, train_labels_mapped)
+        # Note: We don't map val_labels, as they are for triplet loss validation
+        val_ds = GaitWindowDataset(val_windows, val_labels) if val_windows is not None else None
+
+        # Build CosFace model
+        base_model = construct_model(cfg, device)
+        model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(device)
+        
+        train_criterion = CosFaceLoss(margin=cfg.cosface_margin, scale=cfg.cosface_scale)
+
+    else: # Default to Triplet Loss
+        logger.info("Using Triplet loss for training.")
+        train_ds = GaitWindowDataset(train_windows, train_labels)
+        val_ds = GaitWindowDataset(val_windows, val_labels) if val_windows is not None else None
+        
+        model = construct_model(cfg, device)
+        train_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
+
+    train_labels = train_ds.labels.numpy()
     class_counts = np.bincount(train_labels)
     weights = 1.0 / class_counts[train_labels]
     train_sampler = WeightedRandomSampler(
@@ -239,14 +276,13 @@ def train_on_split(
     )
     val_loader = (
         DataLoader(
-            GaitWindowDataset(val_windows, val_labels),
+            val_ds,
             batch_size=cfg.batch_size,
             shuffle=False,
             num_workers=0,
             pin_memory=True,
         )
-        if val_windows is not None
-        else None
+        if val_ds else None
     )
 
     model = construct_model(cfg, device)
@@ -275,10 +311,11 @@ def train_on_split(
         train_loss = _run_epoch(
             model,
             train_loader,
-            criterion,
+            train_criterion,
             optimizer,
             device,
             train=True,
+            loss_type=cfg.loss_type
         )
 
         train_losses.append(train_loss)
@@ -289,10 +326,11 @@ def train_on_split(
                 val_loss = _run_epoch(
                     model,
                     val_loader,
-                    criterion,
+                    val_criterion,
                     None,
                     device,
                     train=False,
+                    loss_type=LossType.TRIPLET  # Always use triplet loss for validation
                 )
                 val_emb_by_pid = compute_embeddings(
                     model, val_windows, val_labels, device, cfg.batch_size
@@ -442,8 +480,6 @@ def fooberino(cfg: TrainConfig) -> None:
     device = torch.device("mps" if torch.backends.mps.is_available() else device)
     logger.info("Using device: %s", device)
 
-    criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
-
     train_pids, val_pids, test_pids = participant_split(participants, cfg)
     development_pids = np.concatenate([train_pids, val_pids])
 
@@ -460,7 +496,6 @@ def fooberino(cfg: TrainConfig) -> None:
                 v_pids,
                 test_pids=None,
                 device=device,
-                criterion=criterion,
                 fold_idx=i + 1,
             )
             fold_histories.append(fold_history)
@@ -501,7 +536,6 @@ def fooberino(cfg: TrainConfig) -> None:
         val_pids=None,
         test_pids=test_pids,
         device=device,
-        criterion=criterion,
         fold_idx=None,
         save_model=True,
     )
