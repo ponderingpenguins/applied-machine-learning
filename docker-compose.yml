@@ -1,0 +1,18 @@
+services:
+  api:
+    build: .
+    container_name: gait-classification-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Optional: mount checkpoint directory for faster model loading
+      - ./gait_classification/checkpoints:/app/gait_classification/checkpoints
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
