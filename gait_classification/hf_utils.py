@@ -9,7 +9,6 @@ from huggingface_hub import HfApi, hf_hub_download, login, whoami
 
 from gait_classification.utils import ModelType
 
-
 HF_REPO_ID = "slugroom/gait-classification-models"
 
 
@@ -37,7 +36,9 @@ def authenticate_hf(token: str | None = None):
             login(token=token)
 
 
-def download_model_checkpoint(model_type: ModelType, cache_dir: Path | None = None) -> Path:
+def download_model_checkpoint(
+    model_type: ModelType, cache_dir: Path | None = None
+) -> Path:
     """Download model checkpoint from HF Hub.
 
     Args:
@@ -47,7 +48,11 @@ def download_model_checkpoint(model_type: ModelType, cache_dir: Path | None = No
     Returns:
         Path to the downloaded checkpoint file.
     """
-    filename = f"final_model_{model_type.value}.pt" if model_type.value == "transformer" else f"best_model_{model_type.value}.pt"
+    filename = (
+        f"final_model_{model_type.value}.pt"
+        if model_type.value == "transformer"
+        else f"best_model_{model_type.value}.pt"
+    )
 
     path = hf_hub_download(
         repo_id=HF_REPO_ID,
@@ -114,10 +119,15 @@ def upload_models(checkpoints_dir: Path, token: str | None = None):
                 repo_id=HF_REPO_ID,
             )
         else:
-            print(f"⚠ {filename} not found, skipping...")
+            print(f"{filename} not found, skipping...")
 
 
-def upload_model_from_training(model_state_dict: dict, model_type: ModelType, checkpoints_dir: Path, token: str | None = None):
+def upload_model_from_training(
+    model_state_dict: dict,
+    model_type: ModelType,
+    checkpoints_dir: Path,
+    token: str | None = None,
+):
     """Upload a single model after training."""
     authenticate_hf(token)
     api = HfApi()
