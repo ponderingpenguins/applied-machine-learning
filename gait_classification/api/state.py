@@ -73,7 +73,15 @@ def get_model_scaler_centroids(model_type: ModelType):
         **({"transformer_dim_feedforward": dim_feedforward} if dim_feedforward else {}),
     )
     model = construct_model(config, torch.device("cpu"))
-    model.load_state_dict(checkpoint["model_state_dict"])
+    state_dict = checkpoint["model_state_dict"]
+    # Strip wrapper prefix if checkpoint was saved from a wrapped model
+    if any(k.startswith("base_model.") for k in state_dict):
+        state_dict = {
+            k[len("base_model."):]: v
+            for k, v in state_dict.items()
+            if k.startswith("base_model.")
+        }
+    model.load_state_dict(state_dict)
     model.eval()
 
     # Try to load scaler from HF, fallback to local
