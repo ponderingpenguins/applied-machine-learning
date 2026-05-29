@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}{{ selected_label }} Enrollment & Authentication{% endblock %}
+{% block title %}Gait Authentication{% endblock %}
 
 {% block content %}
 <main class="shell">
     <section class="hero">
         <div class="eyebrow">Biometric Security</div>
-        <h1>{{ selected_label }} Model</h1>
+        <h1>Gait Authentication</h1>
+        <p class="method-badge">{{ selected_label }}</p>
     </section>
 
     <section class="model-page-container">
@@ -16,11 +17,11 @@
                     <!-- Unenrolled state -->
                     <div id="state-unenrolled">
                         <div class="summary">
-                            <strong>Let's enroll your gait</strong>
-                            <p>Walk naturally for 60 seconds with your phone in your pocket. We'll create your gait profile.</p>
+                            <strong>Set up your walking profile</strong>
+                            <p>Walk normally for 60 seconds with your phone in your pocket. We'll learn your gait pattern and create a personal profile.</p>
                         </div>
                         <div class="button-row">
-                            <button id="enroll-btn" onclick="startEnrollment()" class="primary">Start Enrollment</button>
+                            <button id="enroll-btn" onclick="startEnrollment()" class="primary">Start</button>
                         </div>
                         <div id="enroll-status">
                             <strong id="enroll-countdown">60s remaining</strong>
@@ -46,7 +47,7 @@
                                     <span id="pocket-countdown-num">05</span>
                                 </div>
                             </div>
-                            <p class="pocket-countdown-info">Recording will start automatically</p>
+                            <p class="pocket-countdown-info">Recording starts automatically when the countdown ends</p>
                             <p class="pocket-countdown-cues">
                                 Descending beeps = countdown<br>
                                 3 rising tones = recording started<br>
@@ -68,7 +69,7 @@
                                     <div id="recording-progress"></div>
                                 </div>
                             </div>
-                            <p class="recording-prompt">Keep walking...</p>
+                            <p class="recording-prompt">Keep walking at your normal pace</p>
                             <canvas id="gyro-viz"></canvas>
                             <div class="recording-timer-wrapper">
                                 <div class="recording-timer-label">Elapsed</div>
@@ -80,17 +81,17 @@
                     <!-- Enrolled state -->
                     <div id="state-enrolled">
                         <div class="summary">
-                            <strong>You're enrolled</strong>
+                            <strong>You're set up</strong>
                             <p id="enrollment-count" style="margin-bottom: 8px; font-size: 0.9rem; color: var(--muted);">recordings enrolled</p>
-                            <p>Ready to authenticate. Hold your phone naturally and walk to verify your identity.</p>
+                            <p>Walk normally for 30 seconds with your phone in your pocket to verify your identity.</p>
                         </div>
                         <div class="button-row">
-                            <button id="authenticate-btn" onclick="startAuthenticate()" class="primary">Authenticate</button>
-                            <button id="add-recording-btn" onclick="startEnrollment()" class="secondary">Add Recording</button>
+                            <button id="authenticate-btn" onclick="startAuthenticate()" class="primary">Verify Identity</button>
+                            <button id="add-recording-btn" onclick="startEnrollment()" class="secondary">Add Another Walk</button>
                             <button id="menu-btn" onclick="toggleMenu()" class="secondary">⋯</button>
                         </div>
                         <div id="dev-menu">
-                            <button onclick="startEnrollment()">Add Another Recording</button>
+                            <button onclick="startEnrollment()">Add Another Walk</button>
                             <button onclick="showEmbeddingPlot()">Show Embedding Comparison</button>
                             <button onclick="clearEnrollment()">Clear Enrollment</button>
                         </div>
@@ -139,8 +140,8 @@
                     <!-- No devicemotion fallback -->
                     <div id="state-fallback">
                         <div class="summary">
-                            <strong>Motion sensors unavailable</strong>
-                            <p>Please use a mobile device with motion sensors to enroll and authenticate your gait.</p>
+                            <strong>Motion sensors not available</strong>
+                            <p>Open this page on your smartphone to use the motion sensors needed for gait authentication.</p>
                         </div>
                     </div>
                 </div>
@@ -566,11 +567,11 @@
     function showEnrollmentSuccess(recordingCount) {
         const summary = document.createElement("div");
         summary.className = "summary";
-        summary.innerHTML = `<strong>Recording ${recordingCount} saved</strong><p>You can add more recordings for increased accuracy, or start authenticating.</p>`;
+        summary.innerHTML = `<strong>Walk ${recordingCount} recorded</strong><p>More recordings improve accuracy. Add another or start verifying.</p>`;
 
         const buttonRow = document.createElement("div");
         buttonRow.className = "button-row";
-        buttonRow.innerHTML = '<button onclick="startEnrollment()" class="secondary">Add Another</button><button onclick="updateUI()" class="primary">Done</button>';
+        buttonRow.innerHTML = '<button onclick="startEnrollment()" class="secondary">Add Another</button><button onclick="location.reload()" class="primary">Done</button>';
 
         const mainContent = document.getElementById("main-content");
         mainContent.innerHTML = "";
@@ -586,7 +587,7 @@
 
         const embeddings = loadEnrollmentEmbeddings();
         if (embeddings.length === 0) {
-            alert("No enrollment found");
+            alert("Please set up your profile first.");
             return;
         }
 
@@ -768,7 +769,7 @@
     }
 
     function clearEnrollment() {
-        if (confirm("Clear your enrollment? You'll need to enroll again to authenticate.")) {
+        if (confirm("Remove your walking profile? You'll need to set it up again.")) {
             localStorage.removeItem(STORAGE_KEY);
             location.reload();
         }
@@ -779,4 +780,16 @@
         updateUI();
     })();
 </script>
+
+<style>
+    .method-badge {
+        margin: 12px 0 0 0;
+        font-size: 0.8rem;
+        color: #6b7280;
+        background-color: #f3f4f6;
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 16px;
+    }
+</style>
 {% endblock %}

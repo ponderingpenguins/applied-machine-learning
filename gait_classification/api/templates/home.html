@@ -3,32 +3,155 @@
 {% block title %}Gait Authentication{% endblock %}
 
 {% block content %}
-<main class="shell shell--center">
-    <section class="hero hero--centered">
+<main class="shell">
+    <!-- Hero section -->
+    <section class="hero hero--home">
         <div class="eyebrow">Biometric Security</div>
         <h1>Walk to Authenticate</h1>
-        <p class="intro">Your unique gait pattern is your password. Fast, seamless 2FA.</p>
+        <p class="intro">Your walking pattern is your password. Enroll once, verify in 30 seconds.</p>
     </section>
 
-    <div class="cta-container">
-        <button onclick="window.location.href='/enroll'" class="primary large">Get Started</button>
-    </div>
+    <!-- How it works -->
+    <section class="how-it-works">
+        <h2>How it works</h2>
+        <div class="steps-grid">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>Enroll</h3>
+                <p>Walk normally for 60 seconds with your phone in your pocket. We learn your unique gait pattern.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>Authenticate</h3>
+                <p>Walk for 30 seconds. Your pattern is compared to your enrollment to verify your identity.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>Result</h3>
+                <p>You're either authenticated or not — no passwords needed.</p>
+            </div>
+        </div>
+        <div class="cta-container">
+            <button onclick="window.location.href='/enroll'" class="primary large">Get Started</button>
+        </div>
+    </section>
+
+    <!-- About the project -->
+    <section class="about">
+        <h2>About this research</h2>
+        <p>
+            This is a research project at Rijksuniversiteit Groningen exploring gait recognition as a biometric authentication method.
+            Your smartphone's motion sensors (accelerometer and gyroscope) capture the unique patterns of your walk.
+            Deep learning models analyze these patterns to create a personal gait signature that can verify your identity — a secure second factor for authentication.
+        </p>
+    </section>
+
+    <!-- Detection methods -->
+    <section class="methods">
+        <h2>Try different detection methods</h2>
+        <p>All methods use the same sensor data but analyze it differently. Switch between them to find what works best for you.</p>
+        <div class="methods-grid">
+            <a href="/models/transformer" class="method-card">
+                <h3>Transformer</h3>
+                <p>Uses a Transformer encoder to learn walking patterns from raw sensor data. Best overall accuracy.</p>
+            </a>
+            <a href="/models/lstm" class="method-card">
+                <h3>LSTM</h3>
+                <p>Uses an LSTM network to model the sequence of motion over time. Good for varied walking speeds.</p>
+            </a>
+            <a href="/models/fft_centroids" class="method-card">
+                <h3>FFT Centroids</h3>
+                <p>Extracts frequency features from the motion signal and matches against stored centroids. Fastest inference.</p>
+            </a>
+        </div>
+        <div class="methods-footer">
+            <a href="/methods">View all methods</a>
+        </div>
+    </section>
+
+    <!-- Footer links -->
+    <footer class="home-footer">
+        <a href="/docs">API Documentation</a>
+        <span class="footer-divider">·</span>
+        <a href="https://github.com/ponderingpenguins/applied-machine-learning">GitHub</a>
+    </footer>
 </main>
 
 <style>
-    .shell--center {
+    .shell {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 48px 24px;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        padding: 24px;
+        gap: 80px;
+    }
+
+    .hero--home {
+        text-align: center;
+        padding-bottom: 0;
+    }
+
+    .hero--home h1 {
+        margin-bottom: 16px;
+    }
+
+    .hero--home .intro {
+        max-width: 600px;
+        margin: 0 auto;
+        font-size: 1.1rem;
+        line-height: 1.6;
+    }
+
+    /* How it works section */
+    .how-it-works {
         text-align: center;
     }
 
-    .hero--centered {
-        max-width: 500px;
-        margin: 0 auto 40px;
+    .how-it-works h2 {
+        margin-bottom: 48px;
+        font-size: 1.8rem;
+        font-weight: 600;
+    }
+
+    .steps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 32px;
+        margin-bottom: 48px;
+    }
+
+    .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .step-number {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background-color: var(--accent);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 16px;
+    }
+
+    .step h3 {
+        margin-bottom: 8px;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+
+    .step p {
+        color: var(--muted);
+        font-size: 0.95rem;
+        line-height: 1.5;
     }
 
     .cta-container {
@@ -40,6 +163,170 @@
         padding: 16px 48px;
         font-size: 1.1rem;
         min-width: 220px;
+    }
+
+    /* About section */
+    .about {
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        padding: 48px 32px;
+    }
+
+    .about h2 {
+        margin-bottom: 24px;
+        font-size: 1.8rem;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .about p {
+        max-width: 700px;
+        margin: 0 auto;
+        color: var(--text);
+        font-size: 1rem;
+        line-height: 1.7;
+        text-align: center;
+    }
+
+    /* Methods section */
+    .methods {
+        text-align: center;
+    }
+
+    .methods h2 {
+        margin-bottom: 12px;
+        font-size: 1.8rem;
+        font-weight: 600;
+    }
+
+    .methods > p {
+        color: var(--muted);
+        margin-bottom: 48px;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .methods-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+
+    .method-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 28px 24px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s;
+        text-align: left;
+    }
+
+    .method-card:hover {
+        border-color: var(--accent);
+        background-color: rgba(15, 118, 110, 0.03);
+        transform: translateY(-2px);
+    }
+
+    .method-card h3 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .method-card p {
+        color: var(--muted);
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin: 0;
+        flex-grow: 1;
+    }
+
+
+    .methods-footer {
+        text-align: center;
+        margin-top: 24px;
+    }
+
+    .methods-footer a {
+        color: var(--accent);
+        text-decoration: underline;
+        font-weight: 500;
+    }
+
+    /* Home footer */
+    .home-footer {
+        border-top: 1px solid #e5e7eb;
+        padding-top: 32px;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .home-footer a {
+        color: var(--accent);
+        text-decoration: underline;
+        font-weight: 500;
+    }
+
+    .footer-divider {
+        color: #d1d5db;
+    }
+
+    @media (max-width: 860px) {
+        .shell {
+            gap: 60px;
+            padding: 32px 20px;
+        }
+
+        .how-it-works h2,
+        .methods h2,
+        .about h2 {
+            font-size: 1.5rem;
+        }
+
+        .steps-grid {
+            gap: 24px;
+        }
+
+        .methods-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .about {
+            padding: 32px 20px;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .shell {
+            gap: 48px;
+            padding: 24px 16px;
+        }
+
+        .how-it-works h2,
+        .methods h2,
+        .about h2 {
+            font-size: 1.3rem;
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            font-size: 1.3rem;
+        }
+
+        .primary.large {
+            padding: 12px 32px;
+            font-size: 1rem;
+        }
     }
 </style>
 {% endblock %}

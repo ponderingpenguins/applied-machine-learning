@@ -5,9 +5,9 @@
 {% block content %}
 <main class="shell">
     <section class="hero">
-        <div class="eyebrow">Gait classification</div>
-        <h1>Choose a model to inspect or use.</h1>
-        <p class="intro">This page lists the models currently loaded in the API and gives you a quick selection window for switching between them.</p>
+        <div class="eyebrow">Detection methods</div>
+        <h1>Choose a detection method</h1>
+        <p class="intro">Three different approaches are available. They use the same sensor data but analyze it differently — try another if your results seem off.</p>
     </section>
 
     <section class="layout">
@@ -16,10 +16,9 @@
                 <div class="model-grid">
                     {% for model in model_types %}
                     <article class="model-card {% if model == selected_model %}selected{% endif %}">
-                        <div class="model-card__eyebrow">Available model</div>
+                        <div class="model-card__eyebrow">Method</div>
                         <h2>{{ model | label }}</h2>
-                        <p>Type: <strong>{{ model.value }}</strong></p>
-                        <p>Use this model for embedding generation and classification.</p>
+                        <p>{{ model | description }}</p>
                     </article>
                     {% endfor %}
                 </div>

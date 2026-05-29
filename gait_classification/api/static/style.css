@@ -115,6 +115,7 @@ h2 { margin: 0 0 8px; font-size: 1.3rem; }
 }
 .summary {
     margin-top: 18px;
+    margin-bottom: 12px;
     padding: 16px;
     border-radius: 18px;
     background: var(--accent-soft);
