@@ -64,9 +64,13 @@ def get_model_scaler_centroids(model_type: ModelType):
             )
 
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    dim_feedforward = checkpoint.get("transformer_dim_feedforward") or checkpoint.get(
+        "dim_feedforward"
+    )
     config = TrainConfig(
         model_type=checkpoint["model_type"],
         embedding_size=checkpoint["embedding_size"],
+        **({"transformer_dim_feedforward": dim_feedforward} if dim_feedforward else {}),
     )
     model = construct_model(config, torch.device("cpu"))
     model.load_state_dict(checkpoint["model_state_dict"])
