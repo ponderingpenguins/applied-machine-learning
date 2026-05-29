@@ -1,3 +1,4 @@
+import os
 import pickle
 from typing import Optional
 
@@ -12,11 +13,33 @@ from tqdm import tqdm
 from gait_classification.utils import TrainConfig
 
 
-def load_signal(cfg: TrainConfig, file_name: str):
+def load_signal(signal_dir: str, file_name: str):
     """Load a signal file into a NumPy array of shape (n_samples, n_timesteps)."""
-    return pd.read_csv(
-        f"{cfg.signals_dir}/{file_name}.txt", sep=r"\s+", header=None
-    ).to_numpy()
+    return pd.read_csv(f"{signal_dir}/{file_name}.txt", sep=r"\s+", header=None).to_numpy()
+
+
+def _split_channel_file_name(file_name: str, split: str) -> str:
+    """Convert a train_ channel filename into the matching split filename."""
+    if file_name.startswith("train_"):
+        return f"{split}_{file_name[len('train_') :]}"
+    return file_name
+
+
+def _load_split_data(cfg: TrainConfig, split: str) -> tuple[np.ndarray, np.ndarray]:
+    """Load one dataset split (train or test) into a raw tensor and labels."""
+    base_dir = cfg.train_dir if split == "train" else cfg.test_dir
+    signals_dir = f"{base_dir}/Inertial Signals"
+    y_path = f"{base_dir}/y_{split}.txt"
+
+    channels = []
+    for channel_key in cfg.CHANNEL_FILES.keys():
+        file_name = _split_channel_file_name(cfg.CHANNEL_FILES[channel_key], split)
+        signal = load_signal(signals_dir, file_name)
+        channels.append(signal)
+
+    raw = np.stack(channels, axis=2)
+    y = np.loadtxt(y_path, dtype=int)
+    return raw, y
 
 
 def extract_fft_features(signals, n_samples):
@@ -44,14 +67,11 @@ def load_and_preprocess_data(
     cfg: TrainConfig, preprocess_functions: list
 ) -> tuple[np.ndarray, np.ndarray]:
     """Load and preprocess the data, returning the processed features and labels."""
-    channels = []
-    for channel_key in cfg.CHANNEL_FILES.keys():
-        signal = load_signal(cfg, cfg.CHANNEL_FILES[channel_key])
-        channels.append(signal)
+    train_raw, train_y = _load_split_data(cfg, "train")
+    test_raw, test_y = _load_split_data(cfg, "test")
 
-    raw = np.stack(channels, axis=2)
-
-    y = np.loadtxt(cfg.y_path, dtype=int)
+    raw = np.concatenate([train_raw, test_raw], axis=0)
+    y = np.concatenate([train_y, test_y], axis=0)
 
     # Limit the number of samples if max_samples is set
     n_samples = raw.shape[0]
@@ -174,6 +194,7 @@ def fit_scaler(
     scaler.fit(train_windows_flat)
 
     # Pickle and save the scaler for later use in inference
+    os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     with open(f"{cfg.checkpoint_dir}/scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
 
@@ -266,7 +287,11 @@ class GaitWindowDataset(Dataset):
             labels: Array of shape (N,) with participant IDs.
         """
         self.windows = torch.tensor(windows, dtype=torch.float32)
-        self.labels = labels
+        
+        if not isinstance(labels, torch.Tensor):
+            self.labels = torch.tensor(labels, dtype=torch.long)
+        else:
+            self.labels = labels.long()
 
     def __len__(self) -> int:
         return len(self.labels)

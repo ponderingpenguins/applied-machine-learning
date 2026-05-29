@@ -12,6 +12,13 @@ class ModelType(StrEnum):
     FFT_CENTROIDS = "fft_centroids"
 
 
+class LossType(StrEnum):
+    """Loss function types"""
+
+    TRIPLET = "triplet"
+    COSFACE = "cosface"
+
+
 @dataclass
 class TrainConfig:
     """
@@ -43,11 +50,17 @@ class TrainConfig:
     """
 
     figures_dir: str = "./figures/"
-    batch_size: int = 32
-    num_epochs: int = 10
+    batch_size: int = 128
+    num_epochs: int = 30
     learning_rate: float = 0.001
+    weight_decay: float = 1e-4
+    dropout: float = 0.1
+    early_stopping_patience: int = 5
+    early_stopping_min_delta: float = 0.0
+    evaluation_resamples: int = 10
 
-    model_type: str = "lstm"
+    model_type: str = "transformer"
+    loss_type: str = "cosface"
 
     seed: int = 67  # Six seven...
     fft_threshold: float = 0.95  # Chosen in the preliminary data look notebook by plotting the t-sne of the FFT features to see which threshold gives the best separation.
@@ -55,13 +68,23 @@ class TrainConfig:
     n_folds: int = 5
 
     preprocess_filters: list[str] = field(
-        default_factory=lambda: ["butterworth_lowpass"]
+        default_factory=lambda: ["none"]
     )  # List of filters to apply during preprocessing. Options: "butterworth_lowpass", "kalman", "fft_lowpass", "none"
 
     seq_len: int = 128
     window_stride: int = 128
     embedding_size: int = 64
     triplet_margin: float = 0.3
+    cosface_margin: float = 0.35
+    cosface_scale: float = 30.0
+
+    # Model-specific architecture hyperparameters.
+    lstm_hidden_size: int = 128
+    lstm_num_layers: int = 2
+    transformer_d_model: int = 64
+    transformer_nhead: int = 4
+    transformer_num_layers: int = 2
+    transformer_dim_feedforward: int = 128
 
     train_split: float = 0.70
     val_split: float = 0.15
@@ -72,7 +95,7 @@ class TrainConfig:
     push_to_hf: bool = False
 
     # Data configuration
-    data_dir: str = "Gait-Datasets-TIFS20/Dataset #1"
+    data_dir: str = "./Gait-Datasets-TIFS20/Dataset #1"
     train_dir: str = f"{data_dir}/train"
     test_dir: str = f"{data_dir}/test"
     signals_dir: str = f"{train_dir}/Inertial Signals"
