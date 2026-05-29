@@ -24,9 +24,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Gait Classification API",
-    description="API for encoding and classifying gait data",
+    description=(
+        "Deep learning-based gait biometric authentication system. "
+        "Encode gait recordings from IMU sensor data into embeddings, "
+        "authenticate users against enrollment profiles, and visualize "
+        "authentication attempts in embedding space using t-SNE."
+    ),
     version="1.0.0",
     lifespan=lifespan,
+    openapi_tags=[
+        {
+            "name": "Gait Encoding & Authentication",
+            "description": "Endpoints for gait encoding, authentication, and visualization",
+        },
+        {
+            "name": "Model Management",
+            "description": "Endpoints for checking available models",
+        },
+    ],
 )
 
 app.mount(
