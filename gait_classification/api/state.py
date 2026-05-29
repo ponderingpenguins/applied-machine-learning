@@ -27,8 +27,12 @@ def get_model_and_scaler(model_type: ModelType):
             fft_scaler_path = checkpoints_dir / "scaler_fft.pkl"
             with open(fft_scaler_path, "rb") as f:
                 scaler = pickle.load(f)
-        except Exception:
-            raise FileNotFoundError(f"FFT scaler not found at {fft_scaler_path}")
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"FFT scaler not found at {fft_scaler_path}. "
+                "Run: python -m gait_classification.compute_fft_centroids "
+                "to generate FFT centroids and scaler."
+            )
 
         result = (None, scaler)
         _model_cache[cache_key] = result
