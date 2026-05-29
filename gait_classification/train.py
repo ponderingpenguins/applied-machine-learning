@@ -6,16 +6,17 @@ Notes:
 - Todo: evaluate the model the same way as in the paper that we are comparing to
 
 Transformer training example:
-python train.py max_samples=500 batch_size=128 model_type=transformer 'preprocess_filters=[]' n_folds=1
+python train.py max_samples=500 batch_size=128 model_type=transformer 'preprocess_filters=[]'
 
 LSTM training example:
-python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filters=[]' n_folds=1
+python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filters=[]'
 """
 
 import copy
+import json
 import logging
-import os
 import pickle
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -43,7 +44,8 @@ from gait_classification.hf_utils import upload_model_from_training
 from gait_classification.models.cosface_head import CosFaceHead
 from gait_classification.models.models import construct_model
 from gait_classification.triplet_loss import OnlineTripletLoss
-from gait_classification.utils import LossType, ModelType, TrainConfig
+from gait_classification.cosface_loss import CosFaceLoss
+from gait_classification.utils import LossType, TrainConfig, ModelType, format_sectioned_summary
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,48 +62,41 @@ def _run_epoch(
     optimizer=None,
     device: torch.device = None,
     train: bool = False,
-    loss_type: str = LossType.TRIPLET,
+    loss_type: str = LossType.TRIPLET
 ) -> float:
     """Run a single epoch with online semi-hard triplet mining."""
     total_loss = 0.0
     n_batches = 0
-    total_batches = len(loader)
-
+    model.train(mode=train)
     mode = "Train" if train else "Val"
-    pbar = tqdm(loader, desc=f"{mode} batches", leave=False, total=total_batches)
-    for windows, labels in pbar:
-        windows = windows.to(device)
-        labels = labels.to(device)
 
-        if loss_type == LossType.COSFACE:
-            # For CosFace, the model returns logits and labels must be long
-            logits = model(windows)
-            loss = criterion(logits, labels)
-        else:  # Triplet Loss
-            # For Triplet, we get embeddings. If it's a CosFaceHead model (in validation),
-            # we need to call get_embeddings()
-            if isinstance(model, CosFaceHead):
-                embeddings = model.get_embeddings(windows)
+    with torch.set_grad_enabled(train):
+        pbar = tqdm(loader, desc=f"{mode} batches", leave=False, total=len(loader))
+        for windows, labels in pbar:
+            windows = windows.to(device)
+            labels = labels.to(device)
+
+            if loss_type == LossType.COSFACE:
+                loss = criterion(model(windows), labels.long())
             else:
-                embeddings = model(windows)
+                embeddings = model.get_embeddings(windows) if isinstance(model, CosFaceHead) else model(windows)
+                loss, n_triplets = criterion(embeddings, labels.long())
+                if n_triplets == 0:
+                    continue
 
-            loss, n_triplets = criterion(embeddings, labels.long())
-            if n_triplets == 0:
-                continue
 
-        if train:
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
+            if train:
+                optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
 
-        total_loss += loss.item()
-        n_batches += 1
+            total_loss += loss.item()
+            n_batches += 1
+            pbar.set_postfix({"loss": f"{total_loss / n_batches:.4f}"})
 
-        avg_loss = total_loss / n_batches
-        pbar.set_postfix({"loss": f"{avg_loss:.4f}"})
+        pbar.close()
 
-    pbar.close()
     return total_loss / max(n_batches, 1)
 
 
@@ -113,35 +108,28 @@ def compute_embeddings(
     batch_size: int,
 ) -> dict[int, np.ndarray]:
     """Compute embeddings for all windows, grouped by participant."""
-    embeddings_list = []
-
     windows_tensor = torch.tensor(windows, dtype=torch.float32)
     loader = DataLoader(
         windows_tensor, batch_size=batch_size, shuffle=False, num_workers=0
     )
 
-    embeddings_list = []
-    with torch.no_grad():
-        for batch in loader:
-            batch = batch.to(device)
-            if isinstance(model, CosFaceHead):
-                emb = model.get_embeddings(batch)
-            else:
-                emb = model(batch)
-            embeddings_list.append(emb.cpu().numpy())
+    if len(windows) == 0:
+        return {}
 
-    embeddings = np.concatenate(embeddings_list, axis=0)
+    with torch.inference_mode():
+        embeddings = torch.cat(
+            [
+                (model.get_embeddings(batch.to(device)) if isinstance(model, CosFaceHead) else model(batch.to(device)))
+                for batch in loader
+            ],
+            dim=0,
+        ).cpu().numpy()
 
-    embeddings_by_pid = {}
-    for pid in np.unique(labels):
-        mask = labels == pid
-        embeddings_by_pid[pid] = embeddings[mask]
-
-    return embeddings_by_pid
+    return {pid: embeddings[labels == pid] for pid in np.unique(labels)}
 
 
 def summarize_fold_histories(
-    fold_histories: list[dict[str, list[float]]],
+    fold_histories: list[dict[str, list[float]]]
 ) -> dict[str, object]:
     """Compute mean, std, and SEM curves across fold histories."""
 
@@ -156,23 +144,14 @@ def summarize_fold_histories(
             f"{prefix}_sem": sem.tolist(),
         }
 
-    train_curves = [
-        np.asarray(history["train_loss"], dtype=float) for history in fold_histories
-    ]
-    val_loss_curves = [
-        np.asarray(history["val_loss"], dtype=float) for history in fold_histories
-    ]
+    train_curves = [np.asarray(history["train_loss"], dtype=float) for history in fold_histories]
     val_eer_curves = [
         np.asarray(history["val_eer"], dtype=float)
         for history in fold_histories
         if "val_eer" in history and len(history["val_eer"]) > 0
     ]
 
-    summary: dict[str, object] = {
-        "n_folds": len(fold_histories),
-        **_mean_std_sem(train_curves, "train_loss"),
-        **_mean_std_sem(val_loss_curves, "val_loss"),
-    }
+    summary: dict[str, object] = {"n_folds": len(fold_histories), **_mean_std_sem(train_curves, "train_loss")}
 
     if val_eer_curves:
         summary.update(_mean_std_sem(val_eer_curves, "val_eer"))
@@ -223,63 +202,38 @@ def train_on_split(
     scaler = fit_scaler(cfg, windows, labels, train_pids)
     windows_scaled = apply_scaler(windows, scaler)
 
-    train_mask = np.isin(labels, train_pids)
-    val_mask = np.isin(labels, val_pids) if val_pids is not None else None
-    test_mask = np.isin(labels, test_pids) if test_pids is not None else None
+    def _subset(pids):
+        if pids is None:
+            return None, None
+        mask = np.isin(labels, pids)
+        return windows_scaled[mask], labels[mask]
 
-    train_windows, train_labels = windows_scaled[train_mask], labels[train_mask]
-    val_windows, val_labels = (
-        (windows_scaled[val_mask], labels[val_mask])
-        if val_mask is not None
-        else (None, None)
-    )
-    test_windows, test_labels = (
-        (windows_scaled[test_mask], labels[test_mask])
-        if test_mask is not None
-        else (None, None)
-    )
+    train_windows, train_labels = _subset(train_pids)
+    val_windows, val_labels = _subset(val_pids)
+    test_windows, test_labels = _subset(test_pids)
 
-    if cfg.loss_type == LossType.COSFACE:
+    loss_type = LossType(cfg.loss_type)
+    base_model = construct_model(cfg, device)
+
+    if loss_type == LossType.COSFACE:
         logger.info("Using CosFace loss for training.")
-        # Map training PIDs to 0-indexed classes
         unique_train_pids = sorted(np.unique(train_pids))
         pid_to_class_idx = {pid: i for i, pid in enumerate(unique_train_pids)}
-
         train_labels_mapped = torch.tensor(
             [pid_to_class_idx[pid] for pid in train_labels]
         )
 
         train_ds = GaitWindowDataset(train_windows, train_labels_mapped)
-        # Note: We don't map val_labels, as they are for triplet loss validation
-        val_ds = (
-            GaitWindowDataset(val_windows, val_labels)
-            if val_windows is not None
-            else None
-        )
-
-        # Build CosFace model
-        base_model = construct_model(cfg, device)
         model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(
             device
         )
 
-        train_criterion = CosFaceLoss(
-            margin=cfg.cosface_margin, scale=cfg.cosface_scale
-        )
-
-    else:  # Default to Triplet Loss
+        train_criterion = CosFaceLoss(margin=cfg.cosface_margin, scale=cfg.cosface_scale)
+    else:
         logger.info("Using Triplet loss for training.")
         train_ds = GaitWindowDataset(train_windows, train_labels)
-        val_ds = (
-            GaitWindowDataset(val_windows, val_labels)
-            if val_windows is not None
-            else None
-        )
-
-        model = construct_model(cfg, device)
+        model = base_model
         train_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
-
-    val_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
 
     train_labels = train_ds.labels.numpy()
     class_counts = np.bincount(train_labels)
@@ -294,18 +248,6 @@ def train_on_split(
         num_workers=0,
         pin_memory=True,
     )
-    val_loader = (
-        DataLoader(
-            val_ds,
-            batch_size=cfg.batch_size,
-            shuffle=False,
-            num_workers=0,
-            pin_memory=True,
-        )
-        if val_ds
-        else None
-    )
-
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=cfg.learning_rate,
@@ -313,7 +255,6 @@ def train_on_split(
     )
 
     train_losses = []
-    val_losses = []
     val_eers = []
     val_fars = []
     val_frrs = []
@@ -324,9 +265,8 @@ def train_on_split(
     early_stopping_patience = getattr(cfg, "early_stopping_patience", 0)
     early_stopping_min_delta = getattr(cfg, "early_stopping_min_delta", 0.0)
 
-    logger.info("Starting training...")
-    for epoch in tqdm(range(cfg.num_epochs), desc="Epochs"):
-        model.train()
+    logger.info("Starting training loop")
+    for epoch in range(1, cfg.num_epochs + 1):
         train_loss = _run_epoch(
             model,
             train_loader,
@@ -339,27 +279,15 @@ def train_on_split(
 
         train_losses.append(train_loss)
 
-        if val_loader is not None:
-            model.eval()
-            with torch.no_grad():
-                val_loss = _run_epoch(
-                    model,
-                    val_loader,
-                    val_criterion,
-                    None,
-                    device,
-                    train=False,
-                    loss_type=LossType.TRIPLET,
-                )
-                val_emb_by_pid = compute_embeddings(
-                    model, val_windows, val_labels, device, cfg.batch_size
-                )
-                val_eer, val_far, val_frr = compute_far_frr_eer(
-                    val_emb_by_pid,
-                    seed=cfg.seed,
-                    n_resamples=cfg.evaluation_resamples,
-                )
-            val_losses.append(val_loss)
+        if val_windows is not None:
+            val_emb_by_pid = compute_embeddings(
+                model, val_windows, val_labels, device, cfg.batch_size
+            )
+            val_eer, val_far, val_frr = compute_far_frr_eer(
+                val_emb_by_pid,
+                seed=cfg.seed,
+                n_resamples=cfg.evaluation_resamples,
+            )
             val_eers.append(val_eer)
             val_fars.append(val_far)
             val_frrs.append(val_frr)
@@ -373,11 +301,10 @@ def train_on_split(
                 epochs_without_improvement += 1
 
             logger.info(
-                "Epoch %d/%d  train_loss=%.4f  val_loss=%.4f  val_eer=%.2f%%  val_far=%.2f%%  val_frr=%.2f%%",
-                epoch + 1,
+                "Epoch %d/%d | train_loss=%.4f | val_eer=%.2f%% | val_far=%.2f%% | val_frr=%.2f%%",
+                epoch,
                 cfg.num_epochs,
                 train_loss,
-                val_loss,
                 val_eer * 100,
                 val_far * 100,
                 val_frr * 100,
@@ -395,7 +322,7 @@ def train_on_split(
         else:
             logger.info(
                 "Epoch %d/%d  train_loss=%.4f",
-                epoch + 1,
+                epoch,
                 cfg.num_epochs,
                 train_loss,
             )
@@ -409,8 +336,6 @@ def train_on_split(
         )
 
     logger.info("Training complete. Saving history for this run...")
-    import json
-
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     history_fname = (
         f"training_history_fold{fold_idx}.json"
@@ -418,19 +343,19 @@ def train_on_split(
         else "training_history.json"
     )
     history_path = os.path.join(cfg.checkpoint_dir, history_fname)
+    history = {
+        key: value
+        for key, value in {
+            "train_loss": train_losses,
+            "val_eer": val_eers,
+            "val_far": val_fars,
+            "val_frr": val_frrs,
+            "best_val_eer": best_val_eer if best_val_eer != float("inf") else None,
+            "best_epoch": best_epoch if best_epoch >= 0 else None,
+        }.items()
+    }
     with open(history_path, "w") as f:
-        json.dump(
-            {
-                "train_loss": train_losses,
-                "val_loss": val_losses,
-                "val_eer": val_eers,
-                "val_far": val_fars,
-                "val_frr": val_frrs,
-                "best_val_eer": best_val_eer if best_val_eer != float("inf") else None,
-                "best_epoch": best_epoch if best_epoch >= 0 else None,
-            },
-            f,
-        )
+        json.dump(history, f)
     logger.info("Training history saved to %s", history_path)
 
     if test_pids is not None and len(test_pids) > 0:
@@ -472,54 +397,82 @@ def train_on_split(
         )
         logger.info("Final model saved to %s", final_model_path)
 
-        train_emb_by_pid = compute_embeddings(
-            model, train_windows, train_labels, device, cfg.batch_size
-        )
-        centroids = {pid: emb.mean(axis=0) for pid, emb in train_emb_by_pid.items()}
-        centroids_path = os.path.join(
-            cfg.checkpoint_dir, f"centroids_{cfg.model_type}.pkl"
-        )
-        with open(centroids_path, "wb") as f:
-            pickle.dump(centroids, f)
-        logger.info("Centroids saved to %s", centroids_path)
-
-        if cfg.push_to_hf:
-            logger.info("Pushing model to Hugging Face Hub...")
-            try:
-                upload_model_from_training(
-                    model.state_dict(),
-                    ModelType(cfg.model_type),
-                    Path(cfg.checkpoint_dir),
-                )
-                logger.info("Model pushed to Hugging Face successfully!")
-            except Exception as e:
-                logger.error("Failed to push model to Hugging Face: %s", e)
-
-    return {
-        "train_loss": train_losses,
-        "val_loss": val_losses,
-        "val_eer": val_eers,
-        "val_far": val_fars,
-        "val_frr": val_frrs,
-        "best_val_eer": best_val_eer if best_val_eer != float("inf") else None,
-        "best_epoch": best_epoch if best_epoch >= 0 else None,
-    }
-
-
-def fooberino(cfg: TrainConfig) -> None:
+    return history
+def run_training(cfg: TrainConfig) -> None:
     """train the model"""
-    logger.info("Training with config: %s", cfg)
+    logger.info("")
+    logger.info("=== Training run ===")
+    logger.info(
+        "%s",
+        format_sectioned_summary(
+            "Configuration:",
+            [
+                (
+                    "Optimization",
+                    [
+                        ("batch_size", cfg.batch_size),
+                        ("num_epochs", cfg.num_epochs),
+                        ("learning_rate", cfg.learning_rate),
+                        ("weight_decay", cfg.weight_decay),
+                        ("dropout", cfg.dropout),
+                    ],
+                ),
+                (
+                    "Metric/Loss",
+                    [
+                        ("model_type", cfg.model_type),
+                        ("loss_type", cfg.loss_type),
+                        ("embedding_size", cfg.embedding_size),
+                        ("triplet_margin", cfg.triplet_margin),
+                        ("cosface_margin", cfg.cosface_margin),
+                        ("cosface_scale", cfg.cosface_scale),
+                    ],
+                ),
+                (
+                    "Architecture",
+                    [
+                        ("lstm_hidden_size", cfg.lstm_hidden_size),
+                        ("lstm_num_layers", cfg.lstm_num_layers),
+                        ("transformer_d_model", cfg.transformer_d_model),
+                        ("transformer_nhead", cfg.transformer_nhead),
+                        ("transformer_num_layers", cfg.transformer_num_layers),
+                        ("transformer_dim_feedforward", cfg.transformer_dim_feedforward),
+                    ],
+                ),
+                (
+                    "Data",
+                    [
+                        ("n_folds", cfg.n_folds),
+                        ("train_split", cfg.train_split),
+                        ("val_split", cfg.val_split),
+                        ("seq_len", cfg.seq_len),
+                        ("window_stride", cfg.window_stride),
+                        ("max_samples", cfg.max_samples),
+                    ],
+                ),
+                (
+                    "Checkpoints",
+                    [("checkpoint_dir", cfg.checkpoint_dir)],
+                ),
+                (
+                    "Data root",
+                    [("data_dir", cfg.data_dir)],
+                ),
+            ],
+        ),
+    )
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
 
-    logger.info("Loading and windowing data...")
+    logger.info("")
+    logger.info("=== Data loading ===")
 
     preprocess_functions = construct_filters(cfg)
     raw, y = load_and_preprocess_data(cfg, preprocess_functions=preprocess_functions)
     windows, labels = build_windowed_data(cfg, raw, y)
-    logger.info("Total windows: %d", len(windows))
+    logger.info("Loaded %d windows", len(windows))
 
     participants = np.unique(labels)
-    logger.info("Total participants: %d", len(participants))
+    logger.info("Found %d participants", len(participants))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("mps" if torch.backends.mps.is_available() else device)
@@ -532,7 +485,8 @@ def fooberino(cfg: TrainConfig) -> None:
     if cfg.n_folds and cfg.n_folds > 1:
         folds = make_kfold_splits(development_pids, cfg)
         for i, (t_pids, v_pids) in enumerate(folds):
-            logger.info("=== Running development fold %d/%d ===", i + 1, cfg.n_folds)
+            logger.info("")
+            logger.info("=== Development fold %d/%d ===", i + 1, cfg.n_folds)
             fold_history = train_on_split(
                 cfg,
                 windows,
@@ -562,21 +516,18 @@ def fooberino(cfg: TrainConfig) -> None:
             )
             if "val_eer_mean" in cv_summary:
                 logger.info(
-                    "CV mean final metrics: train_loss=%.4f val_loss=%.4f val_eer=%.2f%%",
+                    "CV summary: train_loss=%.4f | val_eer=%.2f%%",
                     cv_summary["train_loss_mean"][-1],
-                    cv_summary["val_loss_mean"][-1],
                     cv_summary["val_eer_mean"][-1] * 100,
                 )
             else:
                 logger.info(
-                    "CV mean final losses: train=%.4f val=%.4f",
+                    "CV summary: train_loss=%.4f",
                     cv_summary["train_loss_mean"][-1],
-                    cv_summary["val_loss_mean"][-1],
                 )
 
-    logger.info(
-        "Retraining final model on all development participants before one test evaluation..."
-    )
+    logger.info("")
+    logger.info("=== Final training on development participants ===")
     train_on_split(
         cfg,
         windows,
@@ -602,7 +553,7 @@ def main() -> None:
         logger.error("Error: %s\n\nUsage: python scratch.py", e)
         sys.exit(1)
 
-    fooberino(cfg)
+    run_training(cfg)
 
 
 if __name__ == "__main__":
