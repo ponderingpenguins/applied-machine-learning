@@ -6,26 +6,28 @@ Notes:
 - Todo: evaluate the model the same way as in the paper that we are comparing to
 
 Transformer training example:
-python train.py max_samples=500 batch_size=128 model_type=transformer 'preprocess_filters=[]'
+python train.py max_samples=500 batch_size=128 model_type=transformer 'preprocess_filters=[]' n_folds=1
 
 LSTM training example:
-python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filters=[]'
+python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filters=[]' n_folds=1
 """
 
+import copy
 import logging
 import os
-import copy
+import pickle
 import sys
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from gait_classification.models.cosface_head import CosFaceHead
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
+from gait_classification.cosface_loss import CosFaceLoss
 from gait_classification.data.filters import construct_filters
 from gait_classification.data.gait_data import (
     GaitWindowDataset,
@@ -33,14 +35,15 @@ from gait_classification.data.gait_data import (
     build_windowed_data,
     fit_scaler,
     load_and_preprocess_data,
-    participant_split,
     make_kfold_splits,
+    participant_split,
 )
 from gait_classification.eval import compute_far_frr_eer
+from gait_classification.hf_utils import upload_model_from_training
+from gait_classification.models.cosface_head import CosFaceHead
 from gait_classification.models.models import construct_model
 from gait_classification.triplet_loss import OnlineTripletLoss
-from gait_classification.cosface_loss import CosFaceLoss
-from gait_classification.utils import LossType, TrainConfig
+from gait_classification.utils import LossType, ModelType, TrainConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,7 +60,7 @@ def _run_epoch(
     optimizer=None,
     device: torch.device = None,
     train: bool = False,
-    loss_type: str = LossType.TRIPLET
+    loss_type: str = LossType.TRIPLET,
 ) -> float:
     """Run a single epoch with online semi-hard triplet mining."""
     total_loss = 0.0
@@ -74,14 +77,14 @@ def _run_epoch(
             # For CosFace, the model returns logits and labels must be long
             logits = model(windows)
             loss = criterion(logits, labels)
-        else: # Triplet Loss
+        else:  # Triplet Loss
             # For Triplet, we get embeddings. If it's a CosFaceHead model (in validation),
             # we need to call get_embeddings()
             if isinstance(model, CosFaceHead):
                 embeddings = model.get_embeddings(windows)
             else:
                 embeddings = model(windows)
-            
+
             loss, n_triplets = criterion(embeddings, labels.long())
             if n_triplets == 0:
                 continue
@@ -138,7 +141,7 @@ def compute_embeddings(
 
 
 def summarize_fold_histories(
-    fold_histories: list[dict[str, list[float]]]
+    fold_histories: list[dict[str, list[float]]],
 ) -> dict[str, object]:
     """Compute mean, std, and SEM curves across fold histories."""
 
@@ -153,8 +156,12 @@ def summarize_fold_histories(
             f"{prefix}_sem": sem.tolist(),
         }
 
-    train_curves = [np.asarray(history["train_loss"], dtype=float) for history in fold_histories]
-    val_loss_curves = [np.asarray(history["val_loss"], dtype=float) for history in fold_histories]
+    train_curves = [
+        np.asarray(history["train_loss"], dtype=float) for history in fold_histories
+    ]
+    val_loss_curves = [
+        np.asarray(history["val_loss"], dtype=float) for history in fold_histories
+    ]
     val_eer_curves = [
         np.asarray(history["val_eer"], dtype=float)
         for history in fold_histories
@@ -191,11 +198,6 @@ def summarize_fold_histories(
     return summary
 
 
-
-
-
-
-
 def train_on_split(
     cfg: TrainConfig,
     windows: np.ndarray,
@@ -227,10 +229,14 @@ def train_on_split(
 
     train_windows, train_labels = windows_scaled[train_mask], labels[train_mask]
     val_windows, val_labels = (
-        (windows_scaled[val_mask], labels[val_mask]) if val_mask is not None else (None, None)
+        (windows_scaled[val_mask], labels[val_mask])
+        if val_mask is not None
+        else (None, None)
     )
     test_windows, test_labels = (
-        (windows_scaled[test_mask], labels[test_mask]) if test_mask is not None else (None, None)
+        (windows_scaled[test_mask], labels[test_mask])
+        if test_mask is not None
+        else (None, None)
     )
 
     if cfg.loss_type == LossType.COSFACE:
@@ -238,24 +244,38 @@ def train_on_split(
         # Map training PIDs to 0-indexed classes
         unique_train_pids = sorted(np.unique(train_pids))
         pid_to_class_idx = {pid: i for i, pid in enumerate(unique_train_pids)}
-        
-        train_labels_mapped = torch.tensor([pid_to_class_idx[pid] for pid in train_labels])
+
+        train_labels_mapped = torch.tensor(
+            [pid_to_class_idx[pid] for pid in train_labels]
+        )
 
         train_ds = GaitWindowDataset(train_windows, train_labels_mapped)
         # Note: We don't map val_labels, as they are for triplet loss validation
-        val_ds = GaitWindowDataset(val_windows, val_labels) if val_windows is not None else None
+        val_ds = (
+            GaitWindowDataset(val_windows, val_labels)
+            if val_windows is not None
+            else None
+        )
 
         # Build CosFace model
         base_model = construct_model(cfg, device)
-        model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(device)
-        
-        train_criterion = CosFaceLoss(margin=cfg.cosface_margin, scale=cfg.cosface_scale)
+        model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(
+            device
+        )
 
-    else: # Default to Triplet Loss
+        train_criterion = CosFaceLoss(
+            margin=cfg.cosface_margin, scale=cfg.cosface_scale
+        )
+
+    else:  # Default to Triplet Loss
         logger.info("Using Triplet loss for training.")
         train_ds = GaitWindowDataset(train_windows, train_labels)
-        val_ds = GaitWindowDataset(val_windows, val_labels) if val_windows is not None else None
-        
+        val_ds = (
+            GaitWindowDataset(val_windows, val_labels)
+            if val_windows is not None
+            else None
+        )
+
         model = construct_model(cfg, device)
         train_criterion = OnlineTripletLoss(margin=cfg.triplet_margin)
 
@@ -282,7 +302,8 @@ def train_on_split(
             num_workers=0,
             pin_memory=True,
         )
-        if val_ds else None
+        if val_ds
+        else None
     )
 
     optimizer = torch.optim.Adam(
@@ -313,7 +334,7 @@ def train_on_split(
             optimizer,
             device,
             train=True,
-            loss_type=cfg.loss_type
+            loss_type=cfg.loss_type,
         )
 
         train_losses.append(train_loss)
@@ -362,7 +383,10 @@ def train_on_split(
                 val_frr * 100,
             )
 
-            if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
+            if (
+                early_stopping_patience > 0
+                and epochs_without_improvement >= early_stopping_patience
+            ):
                 logger.info(
                     "Early stopping triggered after %d epochs without validation EER improvement.",
                     epochs_without_improvement,
@@ -389,7 +413,9 @@ def train_on_split(
 
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     history_fname = (
-        f"training_history_fold{fold_idx}.json" if fold_idx is not None else "training_history.json"
+        f"training_history_fold{fold_idx}.json"
+        if fold_idx is not None
+        else "training_history.json"
     )
     history_path = os.path.join(cfg.checkpoint_dir, history_fname)
     with open(history_path, "w") as f:
@@ -424,7 +450,9 @@ def train_on_split(
         logger.info("Test EER: %.2f%%", eer * 100)
 
     if save_model:
-        final_model_path = os.path.join(cfg.checkpoint_dir, "final_model.pt")
+        final_model_path = os.path.join(
+            cfg.checkpoint_dir, f"final_model_{cfg.model_type}.pt"
+        )
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
@@ -444,6 +472,29 @@ def train_on_split(
         )
         logger.info("Final model saved to %s", final_model_path)
 
+        train_emb_by_pid = compute_embeddings(
+            model, train_windows, train_labels, device, cfg.batch_size
+        )
+        centroids = {pid: emb.mean(axis=0) for pid, emb in train_emb_by_pid.items()}
+        centroids_path = os.path.join(
+            cfg.checkpoint_dir, f"centroids_{cfg.model_type}.pkl"
+        )
+        with open(centroids_path, "wb") as f:
+            pickle.dump(centroids, f)
+        logger.info("Centroids saved to %s", centroids_path)
+
+        if cfg.push_to_hf:
+            logger.info("Pushing model to Hugging Face Hub...")
+            try:
+                upload_model_from_training(
+                    model.state_dict(),
+                    ModelType(cfg.model_type),
+                    Path(cfg.checkpoint_dir),
+                )
+                logger.info("Model pushed to Hugging Face successfully!")
+            except Exception as e:
+                logger.error("Failed to push model to Hugging Face: %s", e)
+
     return {
         "train_loss": train_losses,
         "val_loss": val_losses,
@@ -453,10 +504,6 @@ def train_on_split(
         "best_val_eer": best_val_eer if best_val_eer != float("inf") else None,
         "best_epoch": best_epoch if best_epoch >= 0 else None,
     }
-
-
-
-
 
 
 def fooberino(cfg: TrainConfig) -> None:
@@ -500,7 +547,9 @@ def fooberino(cfg: TrainConfig) -> None:
 
         if fold_histories:
             cv_summary = summarize_fold_histories(fold_histories)
-            cv_summary_path = os.path.join(cfg.checkpoint_dir, "training_history_cv_mean.json")
+            cv_summary_path = os.path.join(
+                cfg.checkpoint_dir, "training_history_cv_mean.json"
+            )
             os.makedirs(cfg.checkpoint_dir, exist_ok=True)
             import json
 
@@ -525,7 +574,9 @@ def fooberino(cfg: TrainConfig) -> None:
                     cv_summary["val_loss_mean"][-1],
                 )
 
-    logger.info("Retraining final model on all development participants before one test evaluation...")
+    logger.info(
+        "Retraining final model on all development participants before one test evaluation..."
+    )
     train_on_split(
         cfg,
         windows,

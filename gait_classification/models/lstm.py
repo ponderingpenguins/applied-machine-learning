@@ -61,7 +61,7 @@ class LSTM(nn.Module):
     ) -> None:
         """Save a model checkpoint."""
         os.makedirs(cfg.checkpoint_dir, exist_ok=True)
-        path = os.path.join(cfg.checkpoint_dir, "best_model.pt")
+        path = os.path.join(cfg.checkpoint_dir, f"best_model_{cfg.model_type}.pt")
         torch.save(
             {
                 "epoch": epoch,
