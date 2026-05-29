@@ -122,10 +122,10 @@ def _build_grid(cfg: TrainConfig) -> list[CandidateUpdate]:
 	"""Build a flat list of candidate configurations to evaluate."""
 
 	grid_dimensions: list[list[CandidateUpdate]] = [
-		[{"learning_rate": value} for value in [1e-4, 5e-4, 1e-3, 5e-3]],
-		[{"weight_decay": value} for value in [1e-5, 1e-4, 5e-4]],
-		[{"dropout": value} for value in [0.05, 0.1, 0.2]],
-		[{"embedding_size": value} for value in [32, 64, 128]],
+		[{"learning_rate": value} for value in [1e-3]],
+		[{"weight_decay": value} for value in [1e-5]],
+		[{"dropout": value} for value in [0]],
+		[{"embedding_size": value} for value in [16, 32]],
 	]
 
 	loss_type = LossType(cfg.loss_type)
@@ -134,8 +134,8 @@ def _build_grid(cfg: TrainConfig) -> list[CandidateUpdate]:
 	elif loss_type == LossType.COSFACE:
 		grid_dimensions.extend(
 			[
-				[{"cosface_margin": value} for value in [0.2, 0.3, 0.4, 0.5]],
-				[{"cosface_scale": value} for value in [8.0, 16.0, 24.0, 30.0]],
+				[{"cosface_margin": value} for value in [0.2, 0.3, 0.4]],
+				[{"cosface_scale": value} for value in [16.0, 24.0, 30.0]],
 			]
 		)
 	else:
@@ -157,8 +157,8 @@ def _build_grid(cfg: TrainConfig) -> list[CandidateUpdate]:
 					{"transformer_d_model": 64, "transformer_nhead": 4},
 					{"transformer_d_model": 128, "transformer_nhead": 8},
 				],
-				[{"transformer_dim_feedforward": value} for value in [128, 256, 512]],
-				[{"transformer_num_layers": value} for value in [2, 4, 6]],
+				[{"transformer_dim_feedforward": value} for value in [128, 256]],
+				[{"transformer_num_layers": value} for value in [2]],
 			]
 		)
 	else:

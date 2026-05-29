@@ -61,11 +61,11 @@ class TrainConfig:
     """
 
     figures_dir: str = "./figures/"
-    batch_size: int = 128
+    batch_size: int = 64
     num_epochs: int = 30
     learning_rate: float = 0.001
-    weight_decay: float = 1e-4
-    dropout: float = 0.1
+    weight_decay: float = 1e-5
+    dropout: float = 0.01
     early_stopping_patience: int = 5
     early_stopping_min_delta: float = 0.0
     evaluation_resamples: int = 10
