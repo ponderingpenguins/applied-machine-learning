@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
 
 
 class ModelType(StrEnum):
@@ -14,6 +15,16 @@ class LossType(StrEnum):
     """Loss function types"""
     TRIPLET = "triplet"
     COSFACE = "cosface"
+
+
+def format_sectioned_summary(title: str, sections: list[tuple[str, list[tuple[str, Any]]]]) -> str:
+    """Condense the crazy summary into a multi-line summary from the values given."""
+
+    lines = [title]
+    for section_title, fields in sections:
+        field_text = ", ".join(f"{label}={value}" for label, value in fields)
+        lines.append(f"  {section_title}: {field_text}")
+    return "\n".join(lines)
 
 
 @dataclass

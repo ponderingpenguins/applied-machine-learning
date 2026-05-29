@@ -23,7 +23,7 @@ from gait_classification.data.gait_data import (
 	participant_split,
 )
 from gait_classification.train import summarize_fold_histories, train_on_split
-from gait_classification.utils import LossType, ModelType, TrainConfig
+from gait_classification.utils import LossType, ModelType, TrainConfig, format_sectioned_summary
 
 logging.basicConfig(
 	level=logging.INFO,
@@ -210,11 +210,62 @@ def _evaluate_grid_results(results: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _run_finetuning(cfg: TrainConfig) -> dict[str, Any]:
-	logger.info("Grid-search finetuning with config: %s", cfg)
+	logger.info("")
+	logger.info("=== Grid search finetuning ===")
+	logger.info(
+		"%s",
+		format_sectioned_summary(
+			"Configuration:",
+			[
+				(
+					"Search",
+					[
+						("model_type", cfg.model_type),
+						("loss_type", cfg.loss_type),
+						("n_folds", cfg.n_folds),
+						("batch_size", cfg.batch_size),
+						("num_epochs", cfg.num_epochs),
+					],
+				),
+				(
+					"Core params",
+					[
+						("learning_rate", cfg.learning_rate),
+						("weight_decay", cfg.weight_decay),
+						("dropout", cfg.dropout),
+						("embedding_size", cfg.embedding_size),
+						("triplet_margin", cfg.triplet_margin),
+						("cosface_margin", cfg.cosface_margin),
+						("cosface_scale", cfg.cosface_scale),
+					],
+				),
+				(
+					"Architecture",
+					[
+						("lstm_hidden_size", cfg.lstm_hidden_size),
+						("lstm_num_layers", cfg.lstm_num_layers),
+						("transformer_d_model", cfg.transformer_d_model),
+						("transformer_nhead", cfg.transformer_nhead),
+						("transformer_num_layers", cfg.transformer_num_layers),
+						("transformer_dim_feedforward", cfg.transformer_dim_feedforward),
+					],
+				),
+				(
+					"Checkpoints",
+					[("checkpoint_dir", cfg.checkpoint_dir)],
+				),
+				(
+					"Data root",
+					[("data_dir", cfg.data_dir)],
+				),
+			],
+		),
+	)
 
 	preprocess_functions = construct_filters(cfg)
 	raw, y = load_and_preprocess_data(cfg, preprocess_functions=preprocess_functions)
 	windows, labels = build_windowed_data(cfg, raw, y)
+	logger.info("")
 	logger.info("Loaded %d windows for grid search", len(windows))
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -225,12 +276,13 @@ def _run_finetuning(cfg: TrainConfig) -> dict[str, Any]:
 	os.makedirs(output_dir, exist_ok=True)
 
 	candidates = _build_grid(cfg)
+	logger.info("")
 	logger.info("Evaluating %d grid combinations", len(candidates))
 
 	results: list[dict[str, Any]] = []
 	for index, candidate_updates in enumerate(candidates, start=1):
 		candidate_cfg = _clone_cfg(cfg, **candidate_updates)
-		logger.info("Evaluating %d/%d: %s", index, len(candidates), _candidate_label(candidate_updates))
+		logger.info("Candidate %d/%d | %s", index, len(candidates), _candidate_label(candidate_updates))
 		candidate_eval = _evaluate_config(candidate_cfg, windows, labels, device)
 		candidate_mean = candidate_eval["primary_mean"]
 		candidate_sem = candidate_eval["primary_sem"]
@@ -242,16 +294,17 @@ def _run_finetuning(cfg: TrainConfig) -> dict[str, Any]:
 				"sem": candidate_sem,
 			}
 		)
-		logger.info("  result: best_val_eer=%.4f ± %.4f", candidate_mean, candidate_sem)
+		logger.info("  best_val_eer=%.4f ± %.4f", candidate_mean, candidate_sem)
 
 	analysis = _evaluate_grid_results(results)
 	absolute_best = analysis["absolute_best"]
 	top_tier = analysis["top_tier"]
 	sorted_results = analysis["sorted_results"]
 
-	logger.info("Grid search complete")
+	logger.info("")
+	logger.info("=== Grid search complete ===")
 	logger.info(
-		"Absolute best: best_val_eer=%.4f ± %.4f with %s",
+		"Absolute best | best_val_eer=%.4f ± %.4f | %s",
 		absolute_best["mean"],
 		absolute_best["sem"],
 		absolute_best["label"],
