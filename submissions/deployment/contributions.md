@@ -8,7 +8,7 @@ Sigurdur Haukur Birgisson — ML pipeline & backend
   inference
   - DevOps: Docker containerization, Hugging Face integration
 
-  Peter Meeus — ML training & evaluation
+Peter Meeus — ML training & evaluation
   - K-fold cross-validation implementation
   - Evaluation metrics: FAR, FRR, EER computation for unseen
   participants
@@ -18,7 +18,7 @@ Sigurdur Haukur Birgisson — ML pipeline & backend
   - Dataset handling fixes and preprocessing optimizations
   - DevOps: pre-commit hooks, code formatting, dependency management
 
-  Efe — Web API & frontend
+Efe — Web API & frontend
   - Initial FastAPI endpoint design and setup
   - Template system and HTML frontend pages
   - API webpage and user interface development
@@ -27,7 +27,7 @@ Sigurdur Haukur Birgisson — ML pipeline & backend
   - API testing framework
   - Filter experimentation and visualization
 
-  Tijje — CosFace loss implementation
+Tijje — CosFace loss implementation
   - Custom linear layer for CosFace loss
   - CosFace loss function implementation and integration
   - Alternative loss function support alongside triplet loss
