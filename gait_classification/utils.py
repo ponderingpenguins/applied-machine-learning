@@ -9,6 +9,7 @@ class ModelType(StrEnum):
 
     LSTM = "lstm"
     TRANSFORMER = "transformer"
+    FFT_CENTROIDS = "fft_centroids"
 
 
 @dataclass

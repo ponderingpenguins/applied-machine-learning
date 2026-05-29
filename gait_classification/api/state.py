@@ -26,7 +26,28 @@ def get_model_scaler_centroids(model_type: ModelType):
     checkpoints_dir = Path(__file__).parent.parent / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-    # Try to load from HuggingFace, fallback to local files
+    # Special handling for FFT+centroids (no neural model)
+    if model_type == ModelType.FFT_CENTROIDS:
+        try:
+            fft_scaler_path = checkpoints_dir / "scaler_fft.pkl"
+            with open(fft_scaler_path, "rb") as f:
+                scaler = pickle.load(f)
+        except Exception:
+            raise FileNotFoundError(f"FFT scaler not found at {fft_scaler_path}")
+
+        fft_centroids = {}
+        try:
+            fft_centroids_path = checkpoints_dir / "centroids_fft_centroids.pkl"
+            with open(fft_centroids_path, "rb") as f:
+                fft_centroids = pickle.load(f)
+        except Exception:
+            raise FileNotFoundError(f"FFT centroids not found")
+
+        result = (None, scaler, fft_centroids)
+        _model_cache[cache_key] = result
+        return result
+
+    # Standard neural model loading
     try:
         checkpoint_path = download_model_checkpoint(
             model_type, cache_dir=checkpoints_dir

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Gait Authentication{% endblock %}
+
+{% block content %}
+<main class="shell shell--center">
+    <section class="hero hero--centered">
+        <div class="eyebrow">Biometric Security</div>
+        <h1>Walk to Authenticate</h1>
+        <p class="intro">Your unique gait pattern is your password. Fast, seamless 2FA.</p>
+    </section>
+
+    <div class="cta-container">
+        <button onclick="window.location.href='/enroll'" class="primary large">Get Started</button>
+    </div>
+</main>
+
+<style>
+    .shell--center {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+        text-align: center;
+    }
+
+    .hero--centered {
+        max-width: 500px;
+        margin: 0 auto 40px;
+    }
+
+    .cta-container {
+        display: flex;
+        justify-content: center;
+    }
+
+    .primary.large {
+        padding: 16px 48px;
+        font-size: 1.1rem;
+        min-width: 220px;
+    }
+</style>
+{% endblock %}

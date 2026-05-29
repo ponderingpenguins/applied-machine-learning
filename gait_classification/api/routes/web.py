@@ -1,7 +1,8 @@
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from gait_classification.api.routes.ml import SensorSample, GaitData
@@ -13,9 +14,12 @@ router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 templates.env.filters["label"] = lambda m: m.value.replace("_", " ").title()
 
+DEFAULT_MODEL = ModelType(os.getenv("DEFAULT_MODEL", "transformer"))
+
 models = {
     ModelType.TRANSFORMER: None,
     ModelType.LSTM: None,
+    ModelType.FFT_CENTROIDS: None,
 }
 
 
@@ -43,7 +47,12 @@ def _build_enrollment_embedding_from_gait_data(
 
 
 @router.get("/", response_class=HTMLResponse)
-async def root(request: Request, model_type: ModelType | None = None):
+async def root(request: Request):
+    return templates.TemplateResponse(request, name="home.html", context={"request": request})
+
+
+@router.get("/dev", response_class=HTMLResponse)
+async def dev(request: Request, model_type: ModelType | None = None):
     model_options = list(models.keys())
     selected = model_type or model_options[0]
     return templates.TemplateResponse(
@@ -59,15 +68,18 @@ async def root(request: Request, model_type: ModelType | None = None):
 
 @router.get("/models", response_class=HTMLResponse)
 async def list_models(request: Request, model_type: ModelType | None = None):
-    model_options = list(models.keys())
-    selected = model_type or model_options[0]
+    return RedirectResponse(url="/dev", status_code=302)
+
+
+@router.get("/enroll", response_class=HTMLResponse)
+async def enroll(request: Request):
     return templates.TemplateResponse(
         request,
-        name="model_selection.html",
+        name="model_page.html",
         context={
             "request": request,
-            "model_types": model_options,
-            "selected_model": selected,
+            "selected_model_value": DEFAULT_MODEL.value,
+            "selected_label": DEFAULT_MODEL.value.replace("_", " ").title(),
         },
     )
 

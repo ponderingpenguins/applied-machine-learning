@@ -8,10 +8,40 @@ from matplotlib import pyplot as plt
 from pydantic import BaseModel
 from sklearn.manifold import TSNE
 
+from scipy.fft import rfft as scipy_rfft
+
 from gait_classification.api.state import get_model_scaler_centroids
 from gait_classification.utils import ModelType
 
 router = APIRouter()
+
+FFT_SEQ_LEN = 128
+FFT_BINS_PER_CHANNEL = 250
+
+
+def _fft_embedding_from_raw(arr: np.ndarray, scaler) -> np.ndarray:
+    """Extract and scale an FFT embedding from a raw (n_samples, 6) recording.
+
+    Windows the recording into seq_len=128 chunks, extracts FFT magnitude
+    features (matching compute_fft_centroids.py), then averages across windows.
+    Uses scaler.n_features_in_ to select the same number of features as training.
+    """
+    n_keep = scaler.n_features_in_
+
+    def _window_features(window):
+        feats = []
+        for ch in range(window.shape[1]):
+            yf = scipy_rfft(window[:, ch])
+            feats.extend(np.abs(yf[:FFT_BINS_PER_CHANNEL]))
+        return np.array(feats[:n_keep], dtype=np.float32)
+
+    windows = [arr[s:s + FFT_SEQ_LEN] for s in range(0, len(arr) - FFT_SEQ_LEN + 1, FFT_SEQ_LEN)]
+    if not windows:
+        padded = np.pad(arr, ((0, FFT_SEQ_LEN - len(arr)), (0, 0)))
+        windows = [padded]
+
+    mean_features = np.mean([_window_features(w) for w in windows], axis=0)
+    return scaler.transform(mean_features.reshape(1, -1))[0]
 
 
 class SensorSample(BaseModel):
@@ -40,6 +70,7 @@ class EmbeddingVisualization(BaseModel):
 models = {
     ModelType.TRANSFORMER: None,
     ModelType.LSTM: None,
+    ModelType.FFT_CENTROIDS: None,
 }
 
 
@@ -59,6 +90,11 @@ def _build_embedding_from_gait_data(
         for s in gait_data.samples
     ]
     arr = np.array(samples, dtype=np.float32)
+
+    # Handle FFT centroids separately
+    if model_type == ModelType.FFT_CENTROIDS:
+        return _fft_embedding_from_raw(arr, scaler).tolist()
+
     arr = scaler.transform(arr)
     tensor = torch.tensor(arr).unsqueeze(0)
 
@@ -87,13 +123,16 @@ async def classify_user(model_type: ModelType, data: GaitData):
         [s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z] for s in data.samples
     ]
     arr = np.array(samples, dtype=np.float32)
-    arr = scaler.transform(arr)
-    tensor = torch.tensor(arr).unsqueeze(0)
 
-    with torch.no_grad():
-        embedding = model(tensor)
-
-    embedding_np = embedding.cpu().numpy()[0]
+    # Handle FFT centroids separately
+    if model_type == ModelType.FFT_CENTROIDS:
+        embedding_np = _fft_embedding_from_raw(arr, scaler)
+    else:
+        arr = scaler.transform(arr)
+        tensor = torch.tensor(arr).unsqueeze(0)
+        with torch.no_grad():
+            embedding = model(tensor)
+        embedding_np = embedding.cpu().numpy()[0]
 
     if centroids:
         distances = {
@@ -102,7 +141,8 @@ async def classify_user(model_type: ModelType, data: GaitData):
         }
         best_pid = min(distances.items(), key=lambda x: x[1])[0]
         best_dist = distances[best_pid]
-        confidence = max(0, 1.0 - (best_dist / 2.0))
+        classify_threshold = 0.5 if model_type != ModelType.FFT_CENTROIDS else 5.0
+        confidence = float(max(0.0, min(1.0, 1.0 - best_dist / (2.0 * classify_threshold))))
         result_text = f"Person {best_pid}"
     else:
         embedding_norm = float(np.linalg.norm(embedding_np))
@@ -124,23 +164,31 @@ async def authenticate_user(model_type: ModelType, data: ClassifyWithReference):
         [s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z] for s in data.samples
     ]
     arr = np.array(samples, dtype=np.float32)
-    arr = scaler.transform(arr)
-    tensor = torch.tensor(arr).unsqueeze(0)
 
-    with torch.no_grad():
-        embedding = model(tensor)
+    # Handle FFT centroids separately
+    if model_type == ModelType.FFT_CENTROIDS:
+        embedding_np = _fft_embedding_from_raw(arr, scaler)
+    else:
+        arr = scaler.transform(arr)
+        tensor = torch.tensor(arr).unsqueeze(0)
+        with torch.no_grad():
+            embedding = model(tensor)
+        embedding_np = embedding.cpu().numpy()[0]
 
-    embedding_np = embedding.cpu().numpy()[0]
     reference_np = np.array(data.reference_embedding, dtype=np.float32)
 
     distance = float(np.linalg.norm(embedding_np - reference_np))
-    threshold = 0.5
+    # Neural embeddings are L2-normalised (unit vectors, d ∈ [0, 2]).
+    # FFT embeddings are StandardScaler-normalised; distance scale differs.
+    threshold = 0.5 if model_type != ModelType.FFT_CENTROIDS else 5.0
     is_match = distance < threshold
-    confidence = max(0, 1.0 - (distance / 2.0))
+    # Confidence = 1.0 at distance=0, 0.5 at the decision boundary, 0.0 at 2×threshold.
+    confidence = float(max(0.0, min(1.0, 1.0 - distance / (2.0 * threshold))))
 
     return {
         "is_match": is_match,
         "distance": distance,
+        "threshold": threshold,
         "confidence": confidence,
         "samples_processed": len(data.samples),
         "embedding": embedding_np.tolist(),

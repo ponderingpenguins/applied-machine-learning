@@ -1,46 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}{{ selected_label }} Model{% endblock %}
+{% block title %}{{ selected_label }} Enrollment & Authentication{% endblock %}
 
 {% block content %}
 <main class="shell">
     <section class="hero">
-        <div class="eyebrow">Gait classification</div>
+        <div class="eyebrow">Biometric Security</div>
         <h1>{{ selected_label }} Model</h1>
     </section>
 
-    <section class="layout">
+    <section style="max-width:560px;margin:0 auto">
         <div class="panel">
             <div class="panel__body">
                 <div id="main-content">
-                    <!-- Enrolled state -->
-                    <div id="state-enrolled" style="display:none">
-                        <div class="summary">
-                            <strong>You're enrolled</strong>
-                            <p>Ready to authenticate. Hold your phone naturally and walk to verify your identity.</p>
-                        </div>
-                        <div class="button-row">
-                            <button id="authenticate-btn" onclick="startAuthenticate()" class="primary">Authenticate</button>
-                            <button id="clear-btn" onclick="clearEnrollment()" class="secondary">Clear Memory</button>
-                        </div>
-                        <div id="auth-result" style="display:none;margin-top:20px" class="summary">
-                            <strong id="auth-result-title"></strong>
-                            <p id="auth-result-msg"></p>
-                            <div id="auth-confidence" style="display:none;margin-top:12px">
-                                <p><strong>Confidence:</strong> <span id="auth-confidence-value">0%</span></p>
-                                <button id="show-embedding-btn" onclick="showEmbeddingPlot()" style="margin-top:8px">Show Embedding Comparison</button>
-                            </div>
-                            <div id="embedding-plot" style="display:none;margin-top:12px;text-align:center">
-                                <img id="embedding-image" style="max-width:100%;border:1px solid #ccc;border-radius:8px" />
-                                <button onclick="hideEmbeddingPlot()" style="margin-top:8px">Hide Plot</button>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Unenrolled state -->
                     <div id="state-unenrolled" style="display:none">
                         <div class="summary">
-                            <strong>You need to enroll first</strong>
+                            <strong>Let's enroll your gait</strong>
                             <p>Walk naturally for 60 seconds with your phone in your pocket. We'll create your gait profile.</p>
                         </div>
                         <div class="button-row">
@@ -52,10 +28,102 @@
                                 <div id="enroll-progress" style="height:100%;background:var(--accent);width:0%;transition:width 1s linear"></div>
                             </div>
                             <p id="enroll-sample-count" style="margin-top:6px;font-size:0.85rem">0 samples collected</p>
+                            <canvas id="gyro-viz-enroll" style="display:none;margin-top:20px;width:100%;height:180px;border:1px solid var(--border);border-radius:12px;background:#fafafa"></canvas>
                         </div>
                         <div id="enroll-error" style="display:none;margin-top:20px;color:#d32f2f">
                             <p id="enroll-error-msg"></p>
                             <button onclick="startEnrollment()" style="margin-top:10px">Try Again</button>
+                        </div>
+                    </div>
+
+                    <!-- Pocket countdown state (shared by enroll & auth) -->
+                    <div id="state-pocket-countdown" style="display:none">
+                        <div style="text-align:center;padding:40px 20px">
+                            <p style="font-size:1.2rem;color:var(--muted);margin-bottom:30px">Put your phone in your pocket</p>
+                            <div style="display:flex;justify-content:center;align-items:center;margin:30px 0">
+                                <div style="text-align:center">
+                                    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">T minus</div>
+                                    <span id="pocket-countdown-num" style="font-size:3.2rem;font-weight:700;color:var(--accent);font-family:monospace">05</span>
+                                </div>
+                            </div>
+                            <p style="font-size:0.9rem;color:var(--muted)">Recording will start automatically</p>
+                        </div>
+                    </div>
+
+                    <!-- Recording state (shared by enroll & auth) -->
+                    <div id="state-recording" style="display:none">
+                        <div style="text-align:center;padding:20px">
+                            <div style="margin-bottom:25px">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                                    <span id="recording-label" style="font-size:0.95rem;font-weight:600;color:var(--ink)">Enrollment</span>
+                                    <span id="recording-duration" style="font-size:0.85rem;color:var(--muted)">60s</span>
+                                </div>
+                                <div style="background:#e8e8e8;border-radius:8px;height:6px;overflow:hidden">
+                                    <div id="recording-progress" style="height:100%;background:var(--accent);width:0%;transition:width 0.1s linear"></div>
+                                </div>
+                            </div>
+                            <p style="font-size:1.1rem;margin-bottom:20px">Keep walking...</p>
+                            <canvas id="gyro-viz" style="width:100%;height:200px;border:1px solid var(--border);border-radius:12px;background:#fafafa"></canvas>
+                            <div style="margin-top:20px">
+                                <div style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Elapsed</div>
+                                <p id="recording-timer" style="font-size:2rem;font-weight:700;color:var(--accent);font-family:monospace;margin:0">00:00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Enrolled state -->
+                    <div id="state-enrolled" style="display:none">
+                        <div class="summary">
+                            <strong>You're enrolled</strong>
+                            <p>Ready to authenticate. Hold your phone naturally and walk to verify your identity.</p>
+                        </div>
+                        <div class="button-row">
+                            <button id="authenticate-btn" onclick="startAuthenticate()" class="primary">Authenticate</button>
+                            <button id="menu-btn" onclick="toggleMenu()" class="secondary" style="padding:14px 16px">⋯</button>
+                        </div>
+                        <div id="dev-menu" style="display:none;margin-top:20px;padding:16px;background:#f5f5f5;border-radius:12px">
+                            <button onclick="showEmbeddingPlot()" style="width:100%;margin-bottom:8px">Show Embedding Comparison</button>
+                            <button onclick="clearEnrollment()" style="width:100%;background:#e7edf3;color:var(--ink)">Clear Enrollment</button>
+                        </div>
+                    </div>
+
+                    <!-- Result screen (green/red overlay) -->
+                    <div id="state-result" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;align-items:center;justify-content:center" onclick="dismissResult()">
+                        <div id="result-background" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.95;transition:opacity 0.4s ease"></div>
+                        <div style="position:relative;z-index:1001;text-align:center;color:white">
+                            <div id="result-icon" style="font-size:4rem;margin-bottom:16px"></div>
+                            <div id="result-confidence" style="font-size:2.4rem;font-weight:700;margin-bottom:4px"></div>
+                            <p id="result-match-label" style="font-size:1rem;margin:0 0 20px;opacity:0.9"></p>
+
+                            <!-- Distance / threshold margin bar -->
+                            <div style="width:240px;margin:0 auto 20px">
+                                <div style="position:relative;height:6px;background:rgba(255,255,255,0.25);border-radius:3px">
+                                    <div id="result-bar-fill" style="position:absolute;top:0;left:0;height:100%;border-radius:3px;background:rgba(255,255,255,0.85);transition:width 0.5s ease;width:0%"></div>
+                                    <!-- Threshold tick at 50% of bar -->
+                                    <div style="position:absolute;top:-5px;left:50%;width:2px;height:16px;background:white;border-radius:1px;transform:translateX(-50%)"></div>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.68rem;opacity:0.65">
+                                    <span>0</span>
+                                    <span>threshold</span>
+                                    <span id="result-bar-max-label"></span>
+                                </div>
+                                <p id="result-margin-label" style="margin:8px 0 0;font-size:0.82rem;font-family:monospace;opacity:0.9"></p>
+                            </div>
+
+                            <p style="font-size:0.85rem;opacity:0.7;margin:0">Tap to continue</p>
+                        </div>
+                    </div>
+
+                    <!-- Embedding plot modal -->
+                    <div id="embedding-plot-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;padding:20px" onclick="hideEmbeddingPlot()">
+                        <div style="background:white;border-radius:16px;max-width:600px;width:100%;padding:24px;max-height:80vh;overflow:auto" onclick="event.stopPropagation()">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                                <h2 style="margin:0">Embedding Comparison</h2>
+                                <button onclick="hideEmbeddingPlot()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0">×</button>
+                            </div>
+                            <div id="embedding-plot" style="text-align:center">
+                                <img id="embedding-image" style="max-width:100%;border:1px solid var(--border);border-radius:8px" />
+                            </div>
                         </div>
                     </div>
 
@@ -80,25 +148,18 @@
                 </div>
             </div>
         </div>
-
-        <aside class="panel">
-            <div class="panel__body">
-                <div class="summary">
-                    <strong>About this page</strong>
-                    <p>This is a personal authentication tool. Your enrollment is stored locally on this device.</p>
-                </div>
-                <div class="helper-links">
-                    <a href="/models">Back to model selection</a>
-                </div>
-            </div>
-        </aside>
     </section>
 </main>
+<style>
+    .shell { padding-top: 32px; padding-bottom: 48px; }
+    #gyro-viz, #gyro-viz-enroll { display: block; width: 100%; height: 180px; }
+</style>
 
 <script>
-    const ENROLL_DURATION_MS = 60000;
+    const POCKET_DELAY_SEC = 5;
+    const ENROLL_DURATION_SEC = 60;
+    const AUTH_DURATION_SEC = 30;
     const POLL_INTERVAL_MS = 500;
-    const AUTH_TIMEOUT_MS = 30000;
     const STORAGE_KEY = "gait_enrollment_{{ selected_model_value }}";
     const MODEL_TYPE = "{{ selected_model_value }}";
 
@@ -106,32 +167,28 @@
     let enrollCollecting = false;
     let enrollTimer = null;
     let authTimer = null;
+    let pocketTimer = null;
     let permissionGranted = false;
     let lastAuthEmbedding = null;
-    let authHistory = [];;
-
+    let authHistory = [];
+    let isAuthenticating = false;
+    let gyroCanvasCtx = null;
+    let gyroDataBuffer = [];
+    let smoothNx = 0;
+    let smoothNy = 0;
+    let audioCtx = null;
 
     async function checkMotionPermission() {
-        const hasDeviceMotion = typeof DeviceMotionEvent !== "undefined";
-
-        if (!hasDeviceMotion) {
-            return false;
-        }
-
-        const hasRequestPermission = typeof DeviceMotionEvent.requestPermission === "function";
-
-        if (!hasRequestPermission) {
-            return true;
-        }
-
-        return null;
+        if (typeof DeviceMotionEvent === "undefined") return false;
+        if (typeof DeviceMotionEvent.requestPermission === "function") return null;
+        return true;
     }
 
     async function requestMotionPermission() {
         try {
             const perm = await DeviceMotionEvent.requestPermission();
             return perm === "granted";
-        } catch (err) {
+        } catch {
             return false;
         }
     }
@@ -139,24 +196,29 @@
     function updateUI() {
         const hasEnrollment = localStorage.getItem(STORAGE_KEY) !== null;
         if (hasEnrollment) {
-            document.getElementById("state-enrolled").style.display = "";
-            document.getElementById("state-unenrolled").style.display = "none";
-            document.getElementById("state-fallback").style.display = "none";
+            showState("state-enrolled");
         } else {
             const hasDeviceMotion = typeof DeviceMotionEvent !== "undefined";
             if (hasDeviceMotion && (permissionGranted === true || permissionGranted === null)) {
-                document.getElementById("state-unenrolled").style.display = "";
-                document.getElementById("state-enrolled").style.display = "none";
-                document.getElementById("state-fallback").style.display = "none";
+                showState("state-unenrolled");
             } else {
-                document.getElementById("state-fallback").style.display = "";
-                document.getElementById("state-unenrolled").style.display = "none";
-                document.getElementById("state-enrolled").style.display = "none";
+                showState("state-fallback");
             }
         }
     }
 
-    function onEnrollMotion(e) {
+    function showState(stateName) {
+        const states = ["state-unenrolled", "state-enrolled", "state-fallback", "state-pocket-countdown", "state-recording"];
+        states.forEach(s => {
+            const el = document.getElementById(s);
+            if (el) el.style.display = s === stateName ? "" : "none";
+        });
+        // Result overlay needs flex to center its content
+        const resultEl = document.getElementById("state-result");
+        if (resultEl) resultEl.style.display = stateName === "state-result" ? "flex" : "none";
+    }
+
+    function onMotion(e) {
         if (!enrollCollecting) return;
         const acc = e.accelerationIncludingGravity;
         const rot = e.rotationRate;
@@ -172,81 +234,244 @@
         });
 
         document.getElementById("enroll-sample-count").textContent = enrollSamples.length + " samples collected";
+        updateGyroVisualization(acc);
+    }
+
+    function updateGyroVisualization(acc) {
+        const canvas = document.getElementById("gyro-viz") || document.getElementById("gyro-viz-enroll");
+        if (!canvas) return;
+
+        // Sync canvas buffer size to its rendered CSS size
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const cssW = rect.width || canvas.offsetWidth || 300;
+        const cssH = rect.height || canvas.offsetHeight || 200;
+        if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
+            canvas.width = Math.round(cssW * dpr);
+            canvas.height = Math.round(cssH * dpr);
+            const ctx2 = canvas.getContext("2d");
+            ctx2.scale(dpr, dpr);
+        }
+
+        const ctx = canvas.getContext("2d");
+        const w = cssW;
+        const h = cssH;
+
+        ctx.save();
+        ctx.fillStyle = "#fafafa";
+        ctx.fillRect(0, 0, w, h);
+
+        // Derive tilt from gravity: normalize by ~9.8 m/s², flip Y for natural feel
+        const rawNx = Math.max(-1, Math.min(1, (acc.x || 0) / 9.8));
+        const rawNy = Math.max(-1, Math.min(1, -(acc.y || 0) / 9.8));
+
+        // Exponential smoothing (alpha=0.12 → very smooth)
+        const alpha = 0.12;
+        smoothNx = smoothNx * (1 - alpha) + rawNx * alpha;
+        smoothNy = smoothNy * (1 - alpha) + rawNy * alpha;
+
+        const margin = 28;
+        const dotX = w / 2 + smoothNx * (w / 2 - margin);
+        const dotY = h / 2 + smoothNy * (h / 2 - margin);
+
+        // Crosshair
+        ctx.strokeStyle = "rgba(215, 224, 234, 0.9)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(w / 2, margin); ctx.lineTo(w / 2, h - margin);
+        ctx.moveTo(margin, h / 2); ctx.lineTo(w - margin, h / 2);
+        ctx.stroke();
+
+        // Border box
+        ctx.strokeStyle = "#d7e0ea";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(margin, margin, w - margin * 2, h - margin * 2);
+
+        // Glow
+        const glow = ctx.createRadialGradient(dotX, dotY, 0, dotX, dotY, 22);
+        glow.addColorStop(0, "rgba(15, 118, 110, 0.35)");
+        glow.addColorStop(1, "rgba(15, 118, 110, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 22, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dot
+        ctx.fillStyle = "#0f766e";
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    // Must be called during a user gesture (button tap) to unlock audio on mobile.
+    function unlockAudio() {
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === "suspended") {
+                audioCtx.resume();
+            }
+            // Play a silent buffer — required by iOS to fully unlock the context
+            const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            src.connect(audioCtx.destination);
+            src.start(0);
+        } catch (e) {}
+    }
+
+    function playBeep(freq, duration, volume = 0.3) {
+        if (!audioCtx) return;
+        try {
+            if (audioCtx.state === "suspended") {
+                audioCtx.resume().then(() => playBeep(freq, duration, volume));
+                return;
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        } catch (e) {
+            console.log("Audio playback failed:", e);
+        }
+    }
+
+    async function startPocketCountdown(onComplete) {
+        showState("state-pocket-countdown");
+        navigator.vibrate?.(200);
+        let sec = POCKET_DELAY_SEC;
+
+        // Show first value immediately so it doesn't feel stuck
+        document.getElementById("pocket-countdown-num").textContent = String(sec).padStart(2, '0');
+
+        const countdown = setInterval(() => {
+            sec--;
+            if (sec <= 0) {
+                clearInterval(countdown);
+                onComplete();
+                return;
+            }
+            document.getElementById("pocket-countdown-num").textContent = String(sec).padStart(2, '0');
+        }, 1000);
     }
 
     async function startEnrollment() {
+        unlockAudio();
         enrollSamples = [];
+        gyroCanvasCtx = null;
+        gyroDataBuffer = [];
+        smoothNx = 0; smoothNy = 0;
 
         if (permissionGranted !== true) {
             const perm = await requestMotionPermission();
             if (!perm) {
-                showEnrollError("Motion sensor permission denied. Please enable it in settings.");
+                showError("enroll-error", "Motion sensor permission denied. Please enable it in settings.");
                 return;
             }
             permissionGranted = true;
         }
 
-        enrollCollecting = true;
-        document.getElementById("enroll-btn").disabled = true;
-        document.getElementById("enroll-status").style.display = "";
-        document.getElementById("enroll-error").style.display = "none";
-        document.getElementById("enroll-progress").style.width = "0%";
-        document.getElementById("enroll-countdown").textContent = "60s remaining";
-        window.addEventListener("devicemotion", onEnrollMotion);
+        await startPocketCountdown(async () => {
+            enrollCollecting = true;
+            document.getElementById("enroll-btn").disabled = true;
+            document.getElementById("enroll-status").style.display = "none";
+            document.getElementById("enroll-error").style.display = "none";
 
-        const startTime = Date.now();
-        enrollTimer = setInterval(() => {
-            const elapsed = Date.now() - startTime;
-            const remaining = Math.max(0, ENROLL_DURATION_MS - elapsed);
-            const pct = Math.min(100, (elapsed / ENROLL_DURATION_MS) * 100);
-            document.getElementById("enroll-progress").style.width = pct + "%";
-            document.getElementById("enroll-countdown").textContent = Math.ceil(remaining / 1000) + "s remaining";
+            showState("state-recording");
+            document.getElementById("recording-label").textContent = "Enrollment";
+            document.getElementById("recording-duration").textContent = ENROLL_DURATION_SEC + "s";
 
-            if (elapsed >= ENROLL_DURATION_MS) {
-                clearInterval(enrollTimer);
-                finishEnrollment();
+            const canvas = document.getElementById("gyro-viz");
+            if (canvas) {
+                gyroCanvasCtx = canvas.getContext("2d");
             }
-        }, 500);
+
+            window.addEventListener("devicemotion", onMotion);
+
+            const startTime = Date.now();
+            enrollTimer = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const elapsedSec = elapsed / 1000;
+                const pct = Math.min(100, (elapsedSec / ENROLL_DURATION_SEC) * 100);
+
+                document.getElementById("recording-progress").style.width = pct + "%";
+
+                const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+                const ss = String(Math.floor(elapsedSec % 60)).padStart(2, '0');
+                document.getElementById("recording-timer").textContent = mm + ":" + ss;
+
+                if (elapsedSec >= ENROLL_DURATION_SEC) {
+                    clearInterval(enrollTimer);
+                    finishEnrollment();
+                }
+            }, POLL_INTERVAL_MS);
+        });
     }
 
-    function showEnrollError(msg) {
-        document.getElementById("enroll-error-msg").textContent = msg;
-        document.getElementById("enroll-error").style.display = "";
+    function showError(errorElementId, msg) {
+        document.getElementById(errorElementId + "-msg").textContent = msg;
+        document.getElementById(errorElementId).style.display = "";
         document.getElementById("enroll-status").style.display = "none";
         document.getElementById("enroll-btn").disabled = false;
-        document.getElementById("enroll-btn").textContent = "Start Enrollment";
     }
 
     async function finishEnrollment() {
         enrollCollecting = false;
-        window.removeEventListener("devicemotion", onEnrollMotion);
+        window.removeEventListener("devicemotion", onMotion);
         document.getElementById("enroll-status").style.display = "none";
         document.getElementById("enroll-btn").disabled = false;
 
         if (enrollSamples.length === 0) {
-            showEnrollError("No samples collected. Make sure motion is enabled.");
+            showError("enroll-error", "No samples collected. Make sure motion is enabled.");
             return;
         }
 
         try {
             const resp = await fetch("/models/" + MODEL_TYPE + "/encode-recording", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ samples: enrollSamples }),
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({samples: enrollSamples}),
             });
             if (resp.ok) {
                 const data = await resp.json();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data.embedding));
+                navigator.vibrate?.([100, 50, 100, 50, 300]);
+                playBeep(440, 0.3);
+                showEnrollmentSuccess();
                 updateUI();
             } else {
-                showEnrollError("Server error: " + resp.status);
+                showError("enroll-error", "Server error: " + resp.status);
             }
         } catch (err) {
-            showEnrollError("Network error: " + err.message);
+            showError("enroll-error", "Network error: " + err.message);
         }
     }
 
+    function showEnrollmentSuccess() {
+        const summary = document.createElement("div");
+        summary.className = "summary";
+        summary.innerHTML = "<strong>Enrolled!</strong><p>You're all set. You can now authenticate using your gait.</p>";
+
+        const buttonRow = document.createElement("div");
+        buttonRow.className = "button-row";
+        buttonRow.innerHTML = '<button onclick="location.reload()" class="primary">Continue</button>';
+
+        const mainContent = document.getElementById("main-content");
+        mainContent.innerHTML = "";
+        mainContent.appendChild(summary);
+        mainContent.appendChild(buttonRow);
+    }
+
     async function startAuthenticate() {
+        unlockAudio();
         const embedding = localStorage.getItem(STORAGE_KEY);
         if (!embedding) {
             alert("No enrollment found");
@@ -256,93 +481,138 @@
         if (permissionGranted !== true) {
             const perm = await requestMotionPermission();
             if (!perm) {
-                showAuthResult("Permission denied", "Motion sensor permission required. Please enable it in settings.");
+                showAuthResult("Permission denied", "Motion sensor permission required.");
                 return;
             }
             permissionGranted = true;
         }
 
-        const authenticateBtn = document.getElementById("authenticate-btn");
-        const clearBtn = document.getElementById("clear-btn");
-        authenticateBtn.disabled = true;
-        clearBtn.disabled = true;
-        authenticateBtn.textContent = "Authenticating...";
-
-        document.getElementById("auth-result").style.display = "none";
+        isAuthenticating = true;
+        document.getElementById("authenticate-btn").disabled = true;
+        document.getElementById("menu-btn").disabled = true;
+        document.getElementById("dev-menu").style.display = "none";
 
         enrollSamples = [];
-        enrollCollecting = true;
-        const startTime = Date.now();
-        window.addEventListener("devicemotion", onEnrollMotion);
+        gyroCanvasCtx = null;
+        gyroDataBuffer = [];
+        smoothNx = 0; smoothNy = 0;
 
-        authTimer = setInterval(async () => {
-            const elapsed = Date.now() - startTime;
+        await startPocketCountdown(async () => {
+            enrollCollecting = true;
+            showState("state-recording");
+            document.getElementById("recording-label").textContent = "Authentication";
+            document.getElementById("recording-duration").textContent = AUTH_DURATION_SEC + "s";
 
-            if (enrollSamples.length > 100 || elapsed > AUTH_TIMEOUT_MS) {
-                clearInterval(authTimer);
-                enrollCollecting = false;
-                window.removeEventListener("devicemotion", onEnrollMotion);
-
-                if (enrollSamples.length === 0) {
-                    showAuthResult("No samples collected", "Could not collect motion data.");
-                    authenticateBtn.disabled = false;
-                    clearBtn.disabled = false;
-                    authenticateBtn.textContent = "Authenticate";
-                    return;
-                }
-
-                try {
-                    const resp = await fetch("/models/" + MODEL_TYPE + "/authenticate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            samples: enrollSamples,
-                            reference_embedding: JSON.parse(embedding),
-                        }),
-                    });
-                    if (resp.ok) {
-                        const result = await resp.json();
-                        lastAuthEmbedding = result.embedding;
-                        authHistory.push(result.embedding);
-                        if (authHistory.length > 5) {
-                            authHistory.shift();
-                        }
-                        const confidence = Math.round(result.confidence * 100);
-                        if (result.is_match) {
-                            showAuthResult("Authenticated", "We recognized your gait.", confidence);
-                        } else {
-                            showAuthResult("✗ Not recognized", "Your gait doesn't match your enrollment.", confidence);
-                        }
-                    } else {
-                        showAuthResult("Error", "Server error: " + resp.status);
-                    }
-                } catch (err) {
-                    showAuthResult("Error", "Network error: " + err.message);
-                }
-
-                authenticateBtn.disabled = false;
-                clearBtn.disabled = false;
-                authenticateBtn.textContent = "Authenticate";
+            const canvas = document.getElementById("gyro-viz");
+            if (canvas) {
+                gyroCanvasCtx = canvas.getContext("2d");
             }
-        }, POLL_INTERVAL_MS);
+
+            const startTime = Date.now();
+            window.addEventListener("devicemotion", onMotion);
+
+            authTimer = setInterval(async () => {
+                const elapsed = Date.now() - startTime;
+                const elapsedSec = elapsed / 1000;
+                const pct = Math.min(100, (elapsedSec / AUTH_DURATION_SEC) * 100);
+
+                document.getElementById("recording-progress").style.width = pct + "%";
+
+                const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+                const ss = String(Math.floor(elapsedSec % 60)).padStart(2, '0');
+                document.getElementById("recording-timer").textContent = mm + ":" + ss;
+
+                if (elapsedSec >= AUTH_DURATION_SEC) {
+                    clearInterval(authTimer);
+                    enrollCollecting = false;
+                    window.removeEventListener("devicemotion", onMotion);
+
+                    if (enrollSamples.length === 0) {
+                        showAuthResult("No samples collected", "Could not collect motion data.", false);
+                        return;
+                    }
+
+                    try {
+                        const resp = await fetch("/models/" + MODEL_TYPE + "/authenticate", {
+                            method: "POST",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({
+                                samples: enrollSamples,
+                                reference_embedding: JSON.parse(embedding),
+                            }),
+                        });
+                        if (resp.ok) {
+                            const result = await resp.json();
+                            lastAuthEmbedding = result.embedding;
+                            authHistory.push(result.embedding);
+                            if (authHistory.length > 5) authHistory.shift();
+                            const confidence = Math.round(result.confidence * 100);
+                            showAuthResult(result.is_match, confidence, result.distance, result.threshold);
+                        } else {
+                            showAuthResult(false, null, null, null, "Server error: " + resp.status);
+                        }
+                    } catch (err) {
+                        showAuthResult("Error", "Network error: " + err.message, false);
+                    }
+                }
+            }, POLL_INTERVAL_MS);
+        });
     }
 
-    function showAuthResult(title, msg, confidence) {
-        document.getElementById("auth-result-title").textContent = title;
-        document.getElementById("auth-result-msg").textContent = msg;
-        if (typeof confidence !== "undefined" && confidence !== null) {
-            document.getElementById("auth-confidence-value").textContent = confidence + "%";
-            document.getElementById("auth-confidence").style.display = "";
+    function showAuthResult(isSuccess, confidencePct, distance, threshold, errorMsg) {
+        showState("state-result");
+
+        const bgColor = isSuccess ? "#22c55e" : "#ef4444";
+        document.getElementById("result-background").style.backgroundColor = bgColor;
+        document.getElementById("result-icon").textContent = isSuccess ? "✓" : "✗";
+
+        if (errorMsg) {
+            document.getElementById("result-confidence").textContent = "Error";
+            document.getElementById("result-match-label").textContent = errorMsg;
+            document.getElementById("result-bar-fill").style.width = "0%";
+            document.getElementById("result-margin-label").textContent = "";
+            document.getElementById("result-bar-max-label").textContent = "";
         } else {
-            document.getElementById("auth-confidence").style.display = "none";
+            document.getElementById("result-confidence").textContent = confidencePct + "%";
+            document.getElementById("result-match-label").textContent = isSuccess ? "Match" : "No match";
+
+            // Margin bar: maps [0, 2×threshold] → [0%, 100%], threshold tick at 50%
+            const barMax = 2 * threshold;
+            const fillPct = Math.min(100, (distance / barMax) * 100).toFixed(1);
+            document.getElementById("result-bar-fill").style.width = fillPct + "%";
+            document.getElementById("result-bar-max-label").textContent = barMax.toFixed(2);
+
+            const margin = Math.abs(distance - threshold).toFixed(3);
+            const direction = distance < threshold ? "below" : "above";
+            document.getElementById("result-margin-label").textContent =
+                `d=${distance.toFixed(3)}  ·  ${margin} ${direction} threshold`;
         }
-        document.getElementById("embedding-plot").style.display = "none";
-        document.getElementById("auth-result").style.display = "";
+
+        if (isSuccess) {
+            navigator.vibrate?.([200, 100, 200]);
+            playBeep(880, 0.2);
+        } else {
+            navigator.vibrate?.(500);
+            playBeep(220, 0.4);
+        }
+
+    }
+
+    function dismissResult() {
+        showState("state-enrolled");
+        document.getElementById("authenticate-btn").disabled = false;
+        document.getElementById("menu-btn").disabled = false;
+        isAuthenticating = false;
+    }
+
+    function toggleMenu() {
+        const menu = document.getElementById("dev-menu");
+        menu.style.display = menu.style.display === "" ? "none" : "";
     }
 
     function showEmbeddingPlot() {
         if (!lastAuthEmbedding) {
-            alert("No embedding data available. Try authenticating again.");
+            alert("No embedding data available. Authenticate first.");
             return;
         }
 
@@ -352,47 +622,35 @@
             return;
         }
 
-        document.getElementById("show-embedding-btn").disabled = true;
-        document.getElementById("show-embedding-btn").textContent = "Loading...";
+        document.getElementById("embedding-image").removeAttribute("src");
+        document.getElementById("embedding-plot-modal").style.display = "flex";
 
         const referenceEmbedding = JSON.parse(embedding);
 
         fetch("/embeddings/plot", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify({
                 reference_embedding: referenceEmbedding,
                 auth_history: authHistory,
             }),
         })
-            .then(resp => {
-                if (resp.ok) {
-                    return resp.blob();
-                }
-                throw new Error("Failed to generate plot");
-            })
+            .then(resp => resp.ok ? resp.blob() : Promise.reject("Failed to generate plot"))
             .then(blob => {
                 const url = URL.createObjectURL(blob);
                 document.getElementById("embedding-image").src = url;
-                document.getElementById("embedding-plot").style.display = "";
-                document.getElementById("show-embedding-btn").disabled = false;
-                document.getElementById("show-embedding-btn").textContent = "Show Embedding Comparison";
             })
-            .catch(err => {
-                alert("Error generating plot: " + err.message);
-                document.getElementById("show-embedding-btn").disabled = false;
-                document.getElementById("show-embedding-btn").textContent = "Show Embedding Comparison";
-            });
+            .catch(err => alert("Error generating plot: " + err));
     }
 
     function hideEmbeddingPlot() {
-        document.getElementById("embedding-plot").style.display = "none";
+        document.getElementById("embedding-plot-modal").style.display = "none";
     }
 
     function clearEnrollment() {
         if (confirm("Clear your enrollment? You'll need to enroll again to authenticate.")) {
             localStorage.removeItem(STORAGE_KEY);
-            updateUI();
+            location.reload();
         }
     }
 
