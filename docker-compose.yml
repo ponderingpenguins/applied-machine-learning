@@ -3,7 +3,7 @@ services:
     build: .
     container_name: gait-classification-api
     ports:
-      - "8000:8000"
+      - "8050:8000"
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
