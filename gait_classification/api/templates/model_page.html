@@ -9,12 +9,12 @@
         <h1>{{ selected_label }} Model</h1>
     </section>
 
-    <section style="max-width:560px;margin:0 auto">
+    <section class="model-page-container">
         <div class="panel">
             <div class="panel__body">
                 <div id="main-content">
                     <!-- Unenrolled state -->
-                    <div id="state-unenrolled" style="display:none">
+                    <div id="state-unenrolled">
                         <div class="summary">
                             <strong>Let's enroll your gait</strong>
                             <p>Walk naturally for 60 seconds with your phone in your pocket. We'll create your gait profile.</p>
@@ -22,113 +22,119 @@
                         <div class="button-row">
                             <button id="enroll-btn" onclick="startEnrollment()" class="primary">Start Enrollment</button>
                         </div>
-                        <div id="enroll-status" style="display:none;margin-top:20px">
+                        <div id="enroll-status">
                             <strong id="enroll-countdown">60s remaining</strong>
-                            <div style="margin-top:10px;background:#c8e6e3;border-radius:14px;height:8px;overflow:hidden">
-                                <div id="enroll-progress" style="height:100%;background:var(--accent);width:0%;transition:width 1s linear"></div>
+                            <div class="enroll-progress-wrapper">
+                                <div id="enroll-progress"></div>
                             </div>
-                            <p id="enroll-sample-count" style="margin-top:6px;font-size:0.85rem">0 samples collected</p>
-                            <canvas id="gyro-viz-enroll" style="display:none;margin-top:20px;width:100%;height:180px;border:1px solid var(--border);border-radius:12px;background:#fafafa"></canvas>
+                            <p id="enroll-sample-count" class="enroll-sample-count">0 samples collected</p>
+                            <canvas id="gyro-viz-enroll"></canvas>
                         </div>
-                        <div id="enroll-error" style="display:none;margin-top:20px;color:#d32f2f">
+                        <div id="enroll-error">
                             <p id="enroll-error-msg"></p>
-                            <button onclick="startEnrollment()" style="margin-top:10px">Try Again</button>
+                            <button onclick="startEnrollment()">Try Again</button>
                         </div>
                     </div>
 
                     <!-- Pocket countdown state (shared by enroll & auth) -->
-                    <div id="state-pocket-countdown" style="display:none">
-                        <div style="text-align:center;padding:40px 20px">
-                            <p style="font-size:1.2rem;color:var(--muted);margin-bottom:30px">Put your phone in your pocket</p>
-                            <div style="display:flex;justify-content:center;align-items:center;margin:30px 0">
-                                <div style="text-align:center">
-                                    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">T minus</div>
-                                    <span id="pocket-countdown-num" style="font-size:3.2rem;font-weight:700;color:var(--accent);font-family:monospace">05</span>
+                    <div id="state-pocket-countdown">
+                        <div class="pocket-countdown-wrapper">
+                            <p class="pocket-countdown-intro">Put your phone in your pocket</p>
+                            <div class="pocket-countdown-center">
+                                <div class="pocket-countdown-timer">
+                                    <div class="pocket-countdown-label">T minus</div>
+                                    <span id="pocket-countdown-num">05</span>
                                 </div>
                             </div>
-                            <p style="font-size:0.9rem;color:var(--muted)">Recording will start automatically</p>
+                            <p class="pocket-countdown-info">Recording will start automatically</p>
+                            <p class="pocket-countdown-cues">
+                                Descending beeps = countdown<br>
+                                3 rising tones = recording started<br>
+                                2 pings = 10 s left<br>
+                                Ticking = final 5 s
+                            </p>
                         </div>
                     </div>
 
                     <!-- Recording state (shared by enroll & auth) -->
-                    <div id="state-recording" style="display:none">
-                        <div style="text-align:center;padding:20px">
-                            <div style="margin-bottom:25px">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                                    <span id="recording-label" style="font-size:0.95rem;font-weight:600;color:var(--ink)">Enrollment</span>
-                                    <span id="recording-duration" style="font-size:0.85rem;color:var(--muted)">60s</span>
+                    <div id="state-recording">
+                        <div class="recording-wrapper">
+                            <div class="recording-header">
+                                <div class="recording-header-top">
+                                    <span id="recording-label" class="recording-label">Enrollment</span>
+                                    <span id="recording-duration" class="recording-duration">60s</span>
                                 </div>
-                                <div style="background:#e8e8e8;border-radius:8px;height:6px;overflow:hidden">
-                                    <div id="recording-progress" style="height:100%;background:var(--accent);width:0%;transition:width 0.1s linear"></div>
+                                <div class="recording-progress-bar">
+                                    <div id="recording-progress"></div>
                                 </div>
                             </div>
-                            <p style="font-size:1.1rem;margin-bottom:20px">Keep walking...</p>
-                            <canvas id="gyro-viz" style="width:100%;height:200px;border:1px solid var(--border);border-radius:12px;background:#fafafa"></canvas>
-                            <div style="margin-top:20px">
-                                <div style="font-size:0.9rem;color:var(--muted);margin-bottom:8px">Elapsed</div>
-                                <p id="recording-timer" style="font-size:2rem;font-weight:700;color:var(--accent);font-family:monospace;margin:0">00:00</p>
+                            <p class="recording-prompt">Keep walking...</p>
+                            <canvas id="gyro-viz"></canvas>
+                            <div class="recording-timer-wrapper">
+                                <div class="recording-timer-label">Elapsed</div>
+                                <p id="recording-timer">00:00</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Enrolled state -->
-                    <div id="state-enrolled" style="display:none">
+                    <div id="state-enrolled">
                         <div class="summary">
                             <strong>You're enrolled</strong>
                             <p>Ready to authenticate. Hold your phone naturally and walk to verify your identity.</p>
                         </div>
                         <div class="button-row">
                             <button id="authenticate-btn" onclick="startAuthenticate()" class="primary">Authenticate</button>
-                            <button id="menu-btn" onclick="toggleMenu()" class="secondary" style="padding:14px 16px">⋯</button>
+                            <button id="menu-btn" onclick="toggleMenu()" class="secondary">⋯</button>
                         </div>
-                        <div id="dev-menu" style="display:none;margin-top:20px;padding:16px;background:#f5f5f5;border-radius:12px">
-                            <button onclick="showEmbeddingPlot()" style="width:100%;margin-bottom:8px">Show Embedding Comparison</button>
-                            <button onclick="clearEnrollment()" style="width:100%;background:#e7edf3;color:var(--ink)">Clear Enrollment</button>
+                        <div id="dev-menu">
+                            <button onclick="showEmbeddingPlot()">Show Embedding Comparison</button>
+                            <button onclick="clearEnrollment()">Clear Enrollment</button>
                         </div>
                     </div>
 
                     <!-- Result screen (green/red overlay) -->
-                    <div id="state-result" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;align-items:center;justify-content:center" onclick="dismissResult()">
-                        <div id="result-background" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.95;transition:opacity 0.4s ease"></div>
-                        <div style="position:relative;z-index:1001;text-align:center;color:white">
-                            <div id="result-icon" style="font-size:4rem;margin-bottom:16px"></div>
-                            <div id="result-confidence" style="font-size:2.4rem;font-weight:700;margin-bottom:4px"></div>
-                            <p id="result-match-label" style="font-size:1rem;margin:0 0 20px;opacity:0.9"></p>
+                    <div id="state-result" onclick="dismissResult()">
+                        <div id="result-background"></div>
+                        <div class="result-content">
+                            <div id="result-icon"></div>
+                            <div id="result-confidence"></div>
+                            <p id="result-match-label"></p>
 
                             <!-- Distance / threshold margin bar -->
-                            <div style="width:240px;margin:0 auto 20px">
-                                <div style="position:relative;height:6px;background:rgba(255,255,255,0.25);border-radius:3px">
-                                    <div id="result-bar-fill" style="position:absolute;top:0;left:0;height:100%;border-radius:3px;background:rgba(255,255,255,0.85);transition:width 0.5s ease;width:0%"></div>
+                            <div class="result-bar-wrapper">
+                                <div class="result-bar-container">
+                                    <div id="result-bar-fill"></div>
                                     <!-- Threshold tick at 50% of bar -->
-                                    <div style="position:absolute;top:-5px;left:50%;width:2px;height:16px;background:white;border-radius:1px;transform:translateX(-50%)"></div>
+                                    <div class="result-bar-tick"></div>
                                 </div>
-                                <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.68rem;opacity:0.65">
+                                <div class="result-bar-labels">
                                     <span>0</span>
                                     <span>threshold</span>
                                     <span id="result-bar-max-label"></span>
                                 </div>
-                                <p id="result-margin-label" style="margin:8px 0 0;font-size:0.82rem;font-family:monospace;opacity:0.9"></p>
+                                <p id="result-margin-label"></p>
                             </div>
 
-                            <p style="font-size:0.85rem;opacity:0.7;margin:0">Tap to continue</p>
+                            <p class="result-tap-prompt">Tap to continue</p>
                         </div>
                     </div>
 
                     <!-- Embedding plot modal -->
-                    <div id="embedding-plot-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;padding:20px" onclick="hideEmbeddingPlot()">
-                        <div style="background:white;border-radius:16px;max-width:600px;width:100%;padding:24px;max-height:80vh;overflow:auto" onclick="event.stopPropagation()">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                                <h2 style="margin:0">Embedding Comparison</h2>
-                                <button onclick="hideEmbeddingPlot()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0">×</button>
+                    <div id="embedding-plot-modal" onclick="hideEmbeddingPlot()">
+                        <div class="embedding-modal-content" onclick="event.stopPropagation()">
+                            <div class="embedding-modal-header">
+                                <h2>Embedding Comparison</h2>
+                                <button class="embedding-modal-close" onclick="hideEmbeddingPlot()">×</button>
                             </div>
-                            <div id="embedding-plot" style="text-align:center">
-                                <img id="embedding-image" style="max-width:100%;border:1px solid var(--border);border-radius:8px" />
+                            <div id="embedding-plot">
+                                <img id="embedding-image" />
                             </div>
                         </div>
                     </div>
 
                     <!-- No devicemotion fallback -->
-                    <div id="state-fallback" style="display:none">
+                    <div id="state-fallback">
                         <div class="summary">
                             <strong>Motion sensors unavailable</strong>
                             <p>Upload a CSV file with columns: <code>acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z</code></p>
@@ -150,10 +156,6 @@
         </div>
     </section>
 </main>
-<style>
-    .shell { padding-top: 32px; padding-bottom: 48px; }
-    #gyro-viz, #gyro-viz-enroll { display: block; width: 100%; height: 180px; }
-</style>
 
 <script>
     const POCKET_DELAY_SEC = 5;
@@ -177,6 +179,23 @@
     let smoothNx = 0;
     let smoothNy = 0;
     let audioCtx = null;
+    let _audioSessionUnlocked = false;
+    let _lastAudioSec = -1;
+
+    // Builds a minimal valid silent WAV blob — played via <audio> to switch the iOS
+    // audio session from "ambient" (muted by silent switch) to "playback".
+    function _makeSilentWav() {
+        const b = new ArrayBuffer(44);
+        const v = new DataView(b);
+        const s = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+        s(0, "RIFF"); v.setUint32(4, 36, true);
+        s(8, "WAVE"); s(12, "fmt "); v.setUint32(16, 16, true);
+        v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+        v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+        s(36, "data"); v.setUint32(40, 0, true);
+        return new Blob([b], { type: "audio/wav" });
+    }
 
     async function checkMotionPermission() {
         if (typeof DeviceMotionEvent === "undefined") return false;
@@ -184,13 +203,10 @@
         return true;
     }
 
-    async function requestMotionPermission() {
-        try {
-            const perm = await DeviceMotionEvent.requestPermission();
-            return perm === "granted";
-        } catch {
-            return false;
-        }
+    function requestMotionPermission() {
+        // Must be called synchronously inside a user gesture — returns the raw Promise
+        // so the caller can await it after doing other sync work.
+        return DeviceMotionEvent.requestPermission();
     }
 
     function updateUI() {
@@ -208,14 +224,17 @@
     }
 
     function showState(stateName) {
-        const states = ["state-unenrolled", "state-enrolled", "state-fallback", "state-pocket-countdown", "state-recording"];
+        const states = ["state-unenrolled", "state-enrolled", "state-fallback", "state-pocket-countdown", "state-recording", "state-result"];
         states.forEach(s => {
             const el = document.getElementById(s);
-            if (el) el.style.display = s === stateName ? "" : "none";
+            if (el) {
+                if (s === stateName) {
+                    el.classList.add("show");
+                } else {
+                    el.classList.remove("show");
+                }
+            }
         });
-        // Result overlay needs flex to center its content
-        const resultEl = document.getElementById("state-result");
-        if (resultEl) resultEl.style.display = stateName === "state-result" ? "flex" : "none";
     }
 
     function onMotion(e) {
@@ -314,13 +333,25 @@
             if (audioCtx.state === "suspended") {
                 audioCtx.resume();
             }
-            // Play a silent buffer — required by iOS to fully unlock the context
+
+            // iOS: playing an <audio> element switches the session from "ambient"
+            // (muted by silent switch) to "playback". Web Audio API inherits it.
+            if (!_audioSessionUnlocked) {
+                _audioSessionUnlocked = true;
+                const url = URL.createObjectURL(_makeSilentWav());
+                const el = new Audio(url);
+                el.play().catch(() => {}).finally(() => URL.revokeObjectURL(url));
+            }
+
+            // Silent Web Audio buffer — unlocks the AudioContext on iOS
             const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
             const src = audioCtx.createBufferSource();
             src.buffer = buf;
             src.connect(audioCtx.destination);
             src.start(0);
-        } catch (e) {}
+        } catch (e) {
+            console.log("[audio] unlockAudio failed:", e);
+        }
     }
 
     function playBeep(freq, duration, volume = 0.3) {
@@ -339,17 +370,64 @@
             gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
             osc.start();
             osc.stop(audioCtx.currentTime + duration);
-        } catch (e) {
-            console.log("Audio playback failed:", e);
+        } catch (e) {}
+    }
+
+    // Schedule multiple notes using Web Audio's clock so they fire without jitter.
+    function playArpeggio(notes, noteDuration, spacing, volume = 0.4) {
+        if (!audioCtx || audioCtx.state !== "running") return;
+        notes.forEach((freq, i) => {
+            const t = audioCtx.currentTime + i * spacing;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(volume, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + noteDuration);
+                osc.start(t);
+                osc.stop(t + noteDuration);
+            } catch (e) {}
+        });
+    }
+
+    // Called from the recording interval. Fires milestone cues exactly once per second.
+    function playRecordingCues(elapsedSec, durationSec) {
+        const sec = Math.floor(elapsedSec);
+        if (sec === _lastAudioSec) return;
+        _lastAudioSec = sec;
+
+        const remaining = durationSec - sec;
+        const half = Math.floor(durationSec / 2);
+
+        if (sec === 0) {
+            // Go: rapid ascending major triad — C5 E5 G5
+            playArpeggio([523, 659, 784], 0.12, 0.12, 0.45);
+        } else if (sec === half) {
+            // Halfway: single soft ping
+            playBeep(528, 0.4, 0.18);
+        } else if (remaining === 10) {
+            // 10 s left: two soft pings
+            playArpeggio([660, 660], 0.12, 0.2, 0.25);
+        } else if (remaining >= 1 && remaining <= 5) {
+            // Final countdown: ascending ticks (A4 → E5)
+            const finalFreqs = [440, 494, 523, 587, 659];
+            playBeep(finalFreqs[5 - remaining], 0.1, 0.32);
         }
     }
 
     async function startPocketCountdown(onComplete) {
         showState("state-pocket-countdown");
         navigator.vibrate?.(200);
+
+        // A5 → G5 → E5 → D5 → C5 — descending scale communicates "counting down"
+        const tickFreqs = [880, 784, 659, 587, 523];
         let sec = POCKET_DELAY_SEC;
 
-        // Show first value immediately so it doesn't feel stuck
+        const tick = (s) => playBeep(tickFreqs[POCKET_DELAY_SEC - s] ?? 440, 0.08, 0.35);
+
+        tick(sec);
         document.getElementById("pocket-countdown-num").textContent = String(sec).padStart(2, '0');
 
         const countdown = setInterval(() => {
@@ -359,20 +437,26 @@
                 onComplete();
                 return;
             }
+            tick(sec);
             document.getElementById("pocket-countdown-num").textContent = String(sec).padStart(2, '0');
         }, 1000);
     }
 
     async function startEnrollment() {
+        // Both calls must happen synchronously before any await to keep iOS gesture context.
+        const permPromise = permissionGranted !== true && typeof DeviceMotionEvent?.requestPermission === "function"
+            ? requestMotionPermission() : null;
         unlockAudio();
+
         enrollSamples = [];
         gyroCanvasCtx = null;
         gyroDataBuffer = [];
         smoothNx = 0; smoothNy = 0;
 
-        if (permissionGranted !== true) {
-            const perm = await requestMotionPermission();
-            if (!perm) {
+        if (permPromise) {
+            let result;
+            try { result = await permPromise; } catch { result = "denied"; }
+            if (result !== "granted") {
                 showError("enroll-error", "Motion sensor permission denied. Please enable it in settings.");
                 return;
             }
@@ -382,8 +466,10 @@
         await startPocketCountdown(async () => {
             enrollCollecting = true;
             document.getElementById("enroll-btn").disabled = true;
-            document.getElementById("enroll-status").style.display = "none";
-            document.getElementById("enroll-error").style.display = "none";
+            const statusEl = document.getElementById("enroll-status");
+            if (statusEl) statusEl.classList.remove("show");
+            const errorEl = document.getElementById("enroll-error");
+            if (errorEl) errorEl.classList.remove("show");
 
             showState("state-recording");
             document.getElementById("recording-label").textContent = "Enrollment";
@@ -394,6 +480,7 @@
                 gyroCanvasCtx = canvas.getContext("2d");
             }
 
+            _lastAudioSec = -1;
             window.addEventListener("devicemotion", onMotion);
 
             const startTime = Date.now();
@@ -408,6 +495,8 @@
                 const ss = String(Math.floor(elapsedSec % 60)).padStart(2, '0');
                 document.getElementById("recording-timer").textContent = mm + ":" + ss;
 
+                playRecordingCues(elapsedSec, ENROLL_DURATION_SEC);
+
                 if (elapsedSec >= ENROLL_DURATION_SEC) {
                     clearInterval(enrollTimer);
                     finishEnrollment();
@@ -418,15 +507,18 @@
 
     function showError(errorElementId, msg) {
         document.getElementById(errorElementId + "-msg").textContent = msg;
-        document.getElementById(errorElementId).style.display = "";
-        document.getElementById("enroll-status").style.display = "none";
+        const errorEl = document.getElementById(errorElementId);
+        if (errorEl) errorEl.classList.add("show");
+        const statusEl = document.getElementById("enroll-status");
+        if (statusEl) statusEl.classList.remove("show");
         document.getElementById("enroll-btn").disabled = false;
     }
 
     async function finishEnrollment() {
         enrollCollecting = false;
         window.removeEventListener("devicemotion", onMotion);
-        document.getElementById("enroll-status").style.display = "none";
+        const statusEl = document.getElementById("enroll-status");
+        if (statusEl) statusEl.classList.remove("show");
         document.getElementById("enroll-btn").disabled = false;
 
         if (enrollSamples.length === 0) {
@@ -444,7 +536,7 @@
                 const data = await resp.json();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data.embedding));
                 navigator.vibrate?.([100, 50, 100, 50, 300]);
-                playBeep(440, 0.3);
+                playArpeggio([523, 659, 784], 0.5, 0.3, 0.5);
                 showEnrollmentSuccess();
                 updateUI();
             } else {
@@ -471,17 +563,22 @@
     }
 
     async function startAuthenticate() {
+        // Both calls must happen synchronously before any await to keep iOS gesture context.
+        const permPromise = permissionGranted !== true && typeof DeviceMotionEvent?.requestPermission === "function"
+            ? requestMotionPermission() : null;
         unlockAudio();
+
         const embedding = localStorage.getItem(STORAGE_KEY);
         if (!embedding) {
             alert("No enrollment found");
             return;
         }
 
-        if (permissionGranted !== true) {
-            const perm = await requestMotionPermission();
-            if (!perm) {
-                showAuthResult("Permission denied", "Motion sensor permission required.");
+        if (permPromise) {
+            let result;
+            try { result = await permPromise; } catch { result = "denied"; }
+            if (result !== "granted") {
+                showAuthResult(false, 0, 0, 0, "Motion sensor permission required.");
                 return;
             }
             permissionGranted = true;
@@ -490,7 +587,8 @@
         isAuthenticating = true;
         document.getElementById("authenticate-btn").disabled = true;
         document.getElementById("menu-btn").disabled = true;
-        document.getElementById("dev-menu").style.display = "none";
+        const devMenu = document.getElementById("dev-menu");
+        if (devMenu) devMenu.classList.remove("show");
 
         enrollSamples = [];
         gyroCanvasCtx = null;
@@ -508,6 +606,7 @@
                 gyroCanvasCtx = canvas.getContext("2d");
             }
 
+            _lastAudioSec = -1;
             const startTime = Date.now();
             window.addEventListener("devicemotion", onMotion);
 
@@ -521,6 +620,8 @@
                 const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
                 const ss = String(Math.floor(elapsedSec % 60)).padStart(2, '0');
                 document.getElementById("recording-timer").textContent = mm + ":" + ss;
+
+                playRecordingCues(elapsedSec, AUTH_DURATION_SEC);
 
                 if (elapsedSec >= AUTH_DURATION_SEC) {
                     clearInterval(authTimer);
@@ -589,11 +690,11 @@
         }
 
         if (isSuccess) {
-            navigator.vibrate?.([200, 100, 200]);
-            playBeep(880, 0.2);
+            navigator.vibrate?.([100, 50, 100, 50, 300]);
+            playArpeggio([523, 659, 784, 1047], 0.5, 0.28, 0.5);
         } else {
-            navigator.vibrate?.(500);
-            playBeep(220, 0.4);
+            navigator.vibrate?.([500]);
+            playArpeggio([392, 311, 247], 0.6, 0.35, 0.45);
         }
 
     }
@@ -607,7 +708,7 @@
 
     function toggleMenu() {
         const menu = document.getElementById("dev-menu");
-        menu.style.display = menu.style.display === "" ? "none" : "";
+        menu.classList.toggle("show");
     }
 
     function showEmbeddingPlot() {
@@ -623,7 +724,8 @@
         }
 
         document.getElementById("embedding-image").removeAttribute("src");
-        document.getElementById("embedding-plot-modal").style.display = "flex";
+        const modalEl = document.getElementById("embedding-plot-modal");
+        if (modalEl) modalEl.classList.add("show");
 
         const referenceEmbedding = JSON.parse(embedding);
 
@@ -644,7 +746,8 @@
     }
 
     function hideEmbeddingPlot() {
-        document.getElementById("embedding-plot-modal").style.display = "none";
+        const modalEl = document.getElementById("embedding-plot-modal");
+        if (modalEl) modalEl.classList.remove("show");
     }
 
     function clearEnrollment() {

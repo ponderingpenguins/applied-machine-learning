@@ -60,10 +60,24 @@
     </section>
 </main>
 
+<!-- iOS haptic trigger: toggling a switch checkbox fires native tap feedback on iOS 17.4+ -->
+<input type="checkbox" switch id="haptic-trigger" aria-hidden="true">
+
 <script>
     const TARGET = 128;
     let samples = [];
     let collecting = false;
+
+    const _hapticEl = document.getElementById("haptic-trigger");
+    function haptic(type = "light") {
+        // iOS 17.4+: toggling the switch checkbox fires native tap feedback
+        if (_hapticEl) _hapticEl.checked = !_hapticEl.checked;
+        // Android / others
+        if (navigator.vibrate) {
+            const patterns = { light: [15], success: [10, 60, 10], error: [120] };
+            navigator.vibrate(patterns[type] ?? [15]);
+        }
+    }
 
     function showState(stateName) {
         ["home-state", "collecting-state", "result-state", "error-state"].forEach(id => {
@@ -121,6 +135,7 @@
             });
 
             if (!resp.ok) {
+                haptic("error");
                 document.getElementById("error-message").textContent = "Server error: " + resp.status;
                 showState("error-state");
                 return;
@@ -128,8 +143,10 @@
 
             const html = await resp.text();
             document.getElementById("result-state").innerHTML = html;
+            haptic("success");
             showState("result-state");
         } catch (err) {
+            haptic("error");
             document.getElementById("error-message").textContent = "Network error: " + err.message;
             showState("error-state");
         }
@@ -159,6 +176,7 @@
         }
 
         collecting = true;
+        haptic("light");
         showState("collecting-state");
         window.addEventListener("devicemotion", onMotion);
     }
