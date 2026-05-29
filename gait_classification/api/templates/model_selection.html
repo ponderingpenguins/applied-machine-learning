@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Gait Models{% endblock %}
+
+{% block content %}
+<main class="shell">
+    <section class="hero">
+        <div class="eyebrow">Detection methods</div>
+        <h1>Choose a detection method</h1>
+        <p class="intro">Three different approaches are available. They use the same sensor data but analyze it differently — try another if your results seem off.</p>
+    </section>
+
+    <section class="layout">
+        <div class="panel">
+            <div class="panel__body">
+                <div class="model-grid">
+                    {% for model in model_types %}
+                    <article class="model-card {% if model == selected_model %}selected{% endif %}">
+                        <div class="model-card__eyebrow">Method</div>
+                        <h2>{{ model | label }}</h2>
+                        <p>{{ model | description }}</p>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <aside class="panel">
+            <div class="panel__body">
+                <form class="selection" method="get" action="/models">
+                    <label for="model_type">Select a model</label>
+                    <select id="model_type" name="model_type">
+                        {% for model in model_types %}
+                        <option value="{{ model.value }}" {% if model == selected_model %}selected{% endif %}>{{ model | label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="selection__link" onclick="window.location.href='/models/' + document.getElementById('model_type').value">Go to model page</button>
+                </form>
+
+                <div class="links">
+                    <a href="/models/data">View model list as JSON</a>
+                    <a href="/docs">Open API docs</a>
+                </div>
+            </div>
+        </aside>
+    </section>
+</main>
+{% endblock %}

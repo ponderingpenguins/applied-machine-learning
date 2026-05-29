@@ -10,9 +10,12 @@ class ModelType(StrEnum):
 
     LSTM = "lstm"
     TRANSFORMER = "transformer"
+    FFT_CENTROIDS = "fft_centroids"
+
 
 class LossType(StrEnum):
     """Loss function types"""
+
     TRIPLET = "triplet"
     COSFACE = "cosface"
 
@@ -85,7 +88,7 @@ class TrainConfig:
     triplet_margin: float = 0.3
     cosface_margin: float = 0.35
     cosface_scale: float = 30.0
-      
+
     # Model-specific architecture hyperparameters.
     lstm_hidden_size: int = 128
     lstm_num_layers: int = 2
@@ -100,6 +103,7 @@ class TrainConfig:
     max_samples: int = 0
 
     checkpoint_dir: str = "checkpoints"
+    push_to_hf: bool = False
 
     # Data configuration
     data_dir: str = "./Gait-Datasets-TIFS20/Dataset #1"

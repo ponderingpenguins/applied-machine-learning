@@ -15,18 +15,20 @@ python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filte
 import copy
 import json
 import logging
+import pickle
 import os
 import sys
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from gait_classification.models.cosface_head import CosFaceHead
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
+from gait_classification.cosface_loss import CosFaceLoss
 from gait_classification.data.filters import construct_filters
 from gait_classification.data.gait_data import (
     GaitWindowDataset,
@@ -34,14 +36,16 @@ from gait_classification.data.gait_data import (
     build_windowed_data,
     fit_scaler,
     load_and_preprocess_data,
-    participant_split,
     make_kfold_splits,
+    participant_split,
 )
 from gait_classification.eval import compute_far_frr_eer
+from gait_classification.hf_utils import upload_model_from_training
+from gait_classification.models.cosface_head import CosFaceHead
 from gait_classification.models.models import construct_model
 from gait_classification.triplet_loss import OnlineTripletLoss
 from gait_classification.cosface_loss import CosFaceLoss
-from gait_classification.utils import LossType, TrainConfig, format_sectioned_summary
+from gait_classification.utils import LossType, TrainConfig, ModelType, format_sectioned_summary
 
 logging.basicConfig(
     level=logging.INFO,
@@ -79,6 +83,7 @@ def _run_epoch(
                 loss, n_triplets = criterion(embeddings, labels.long())
                 if n_triplets == 0:
                     continue
+
 
             if train:
                 optimizer.zero_grad()
@@ -170,11 +175,6 @@ def summarize_fold_histories(
         )
 
     return summary
-
-
-
-
-
 
 
 def train_on_split(
@@ -301,7 +301,10 @@ def train_on_split(
                 val_frr * 100,
             )
 
-            if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
+            if (
+                early_stopping_patience > 0
+                and epochs_without_improvement >= early_stopping_patience
+            ):
                 logger.info(
                     "Early stopping triggered after %d epochs without validation EER improvement.",
                     epochs_without_improvement,
@@ -326,7 +329,9 @@ def train_on_split(
     logger.info("Training complete. Saving history for this run...")
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     history_fname = (
-        f"training_history_fold{fold_idx}.json" if fold_idx is not None else "training_history.json"
+        f"training_history_fold{fold_idx}.json"
+        if fold_idx is not None
+        else "training_history.json"
     )
     history_path = os.path.join(cfg.checkpoint_dir, history_fname)
     history = {
@@ -361,7 +366,9 @@ def train_on_split(
         logger.info("Test EER: %.2f%%", eer * 100)
 
     if save_model:
-        final_model_path = os.path.join(cfg.checkpoint_dir, "final_model.pt")
+        final_model_path = os.path.join(
+            cfg.checkpoint_dir, f"final_model_{cfg.model_type}.pt"
+        )
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
