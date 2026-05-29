@@ -219,8 +219,15 @@ def train_on_split(
         logger.info("Using CosFace loss for training.")
         unique_train_pids = sorted(np.unique(train_pids))
         pid_to_class_idx = {pid: i for i, pid in enumerate(unique_train_pids)}
-        train_ds = GaitWindowDataset(train_windows, torch.tensor([pid_to_class_idx[pid] for pid in train_labels]))
-        model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(device)
+        train_labels_mapped = torch.tensor(
+            [pid_to_class_idx[pid] for pid in train_labels]
+        )
+
+        train_ds = GaitWindowDataset(train_windows, train_labels_mapped)
+        model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(
+            device
+        )
+
         train_criterion = CosFaceLoss(margin=cfg.cosface_margin, scale=cfg.cosface_scale)
     else:
         logger.info("Using Triplet loss for training.")
@@ -267,13 +274,15 @@ def train_on_split(
             optimizer,
             device,
             train=True,
-            loss_type=cfg.loss_type
+            loss_type=cfg.loss_type,
         )
 
         train_losses.append(train_loss)
 
         if val_windows is not None:
-            val_emb_by_pid = compute_embeddings(model, val_windows, val_labels, device, cfg.batch_size)
+            val_emb_by_pid = compute_embeddings(
+                model, val_windows, val_labels, device, cfg.batch_size
+            )
             val_eer, val_far, val_frr = compute_far_frr_eer(
                 val_emb_by_pid,
                 seed=cfg.seed,
@@ -389,12 +398,6 @@ def train_on_split(
         logger.info("Final model saved to %s", final_model_path)
 
     return history
-
-
-
-
-
-
 def run_training(cfg: TrainConfig) -> None:
     """train the model"""
     logger.info("")
@@ -498,7 +501,9 @@ def run_training(cfg: TrainConfig) -> None:
 
         if fold_histories:
             cv_summary = summarize_fold_histories(fold_histories)
-            cv_summary_path = os.path.join(cfg.checkpoint_dir, "training_history_cv_mean.json")
+            cv_summary_path = os.path.join(
+                cfg.checkpoint_dir, "training_history_cv_mean.json"
+            )
             os.makedirs(cfg.checkpoint_dir, exist_ok=True)
             import json
 
