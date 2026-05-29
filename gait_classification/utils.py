@@ -68,6 +68,7 @@ class TrainConfig:
     max_samples: int = 0
 
     checkpoint_dir: str = "checkpoints"
+    push_to_hf: bool = False
 
     # Data configuration
     data_dir: str = "Gait-Datasets-TIFS20/Dataset #1"

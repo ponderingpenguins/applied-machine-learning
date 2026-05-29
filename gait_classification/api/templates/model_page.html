@@ -6,62 +6,69 @@
 <main class="shell">
     <section class="hero">
         <div class="eyebrow">Gait classification</div>
-        <h1>{{ selected_label }} model page.</h1>
-        <p class="intro">Enroll a trusted user by walking for 60 seconds, then classify users against the enrolled set.</p>
+        <h1>{{ selected_label }} Model</h1>
     </section>
 
     <section class="layout">
         <div class="panel">
             <div class="panel__body">
-                <div class="action-row">
-                    <a class="selection__link" href="#add-trusted-user">Add trusted user</a>
-                    <a class="selection__link" href="/models/{{ selected_model_value }}/classify">Classify user</a>
-                </div>
-
-                <div id="status-message" class="summary">
-                    <strong>Selected model</strong>
-                    <p>{{ selected_label }} is ready for trusted-user enrollment and classification.</p>
-                    {% if status_message %}<p>{{ status_message }}</p>{% endif %}
-                </div>
-
-                <div class="workflow" id="add-trusted-user">
-                    <h2>Add trusted user</h2>
-
-                    <!-- Recording UI (shown when devicemotion is available) -->
-                    <div id="record-ui">
-                        <div id="record-home">
-                            <p>Walk naturally for 60 seconds with your phone in your pocket. We will encode your gait using the model.</p>
-                            <div class="button-row">
-                                <button onclick="startEnrollment()">Start Recording</button>
-                            </div>
+                <div id="main-content">
+                    <!-- Enrolled state -->
+                    <div id="state-enrolled" style="display:none">
+                        <div class="summary">
+                            <strong>You're enrolled</strong>
+                            <p>Ready to authenticate. Hold your phone naturally and walk to verify your identity.</p>
                         </div>
-
-                        <div id="record-collecting" style="display:none">
-                            <p>Keep walking...</p>
-                            <div class="summary" style="margin-top:12px">
-                                <strong id="record-countdown">60s remaining</strong>
-                                <div style="margin-top:10px;background:#c8e6e3;border-radius:14px;height:8px;overflow:hidden">
-                                    <div id="record-progress" style="height:100%;background:var(--accent);width:0%;transition:width 1s linear"></div>
-                                </div>
-                                <p id="record-sample-count" style="margin-top:6px;font-size:0.85rem">0 samples collected</p>
-                            </div>
+                        <div class="button-row">
+                            <button id="authenticate-btn" onclick="startAuthenticate()" class="primary">Authenticate</button>
+                            <button id="clear-btn" onclick="clearEnrollment()" class="secondary">Clear Memory</button>
                         </div>
-
-                        <div id="record-done" style="display:none">
-                            <p id="record-done-msg"></p>
-                            <div class="button-row">
-                                <button onclick="startEnrollment()">Record Again</button>
+                        <div id="auth-result" style="display:none;margin-top:20px" class="summary">
+                            <strong id="auth-result-title"></strong>
+                            <p id="auth-result-msg"></p>
+                            <div id="auth-confidence" style="display:none;margin-top:12px">
+                                <p><strong>Confidence:</strong> <span id="auth-confidence-value">0%</span></p>
+                                <button id="show-embedding-btn" onclick="showEmbeddingPlot()" style="margin-top:8px">Show Embedding Comparison</button>
+                            </div>
+                            <div id="embedding-plot" style="display:none;margin-top:12px;text-align:center">
+                                <img id="embedding-image" style="max-width:100%;border:1px solid #ccc;border-radius:8px" />
+                                <button onclick="hideEmbeddingPlot()" style="margin-top:8px">Hide Plot</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- CSV fallback (shown when devicemotion is unavailable) -->
-                    <div id="upload-ui" style="display:none">
-                        <p>Motion sensors not available on this device. Upload a CSV file with columns: <code>acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z</code> (one row per sample, no header required).</p>
+                    <!-- Unenrolled state -->
+                    <div id="state-unenrolled" style="display:none">
+                        <div class="summary">
+                            <strong>You need to enroll first</strong>
+                            <p>Walk naturally for 60 seconds with your phone in your pocket. We'll create your gait profile.</p>
+                        </div>
+                        <div class="button-row">
+                            <button id="enroll-btn" onclick="startEnrollment()" class="primary">Start Enrollment</button>
+                        </div>
+                        <div id="enroll-status" style="display:none;margin-top:20px">
+                            <strong id="enroll-countdown">60s remaining</strong>
+                            <div style="margin-top:10px;background:#c8e6e3;border-radius:14px;height:8px;overflow:hidden">
+                                <div id="enroll-progress" style="height:100%;background:var(--accent);width:0%;transition:width 1s linear"></div>
+                            </div>
+                            <p id="enroll-sample-count" style="margin-top:6px;font-size:0.85rem">0 samples collected</p>
+                        </div>
+                        <div id="enroll-error" style="display:none;margin-top:20px;color:#d32f2f">
+                            <p id="enroll-error-msg"></p>
+                            <button onclick="startEnrollment()" style="margin-top:10px">Try Again</button>
+                        </div>
+                    </div>
+
+                    <!-- No devicemotion fallback -->
+                    <div id="state-fallback" style="display:none">
+                        <div class="summary">
+                            <strong>Motion sensors unavailable</strong>
+                            <p>Upload a CSV file with columns: <code>acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z</code></p>
+                        </div>
                         <form class="form-grid"
                               hx-post="/models/{{ selected_model_value }}/encode"
-                              hx-target="#status-message"
-                              hx-swap="outerHTML"
+                              hx-target="#main-content"
+                              hx-swap="innerHTML"
                               enctype="multipart/form-data">
                             <label for="trusted_user_file">Upload CSV file</label>
                             <input id="trusted_user_file" name="trusted_user_file" type="file" accept=".csv,.txt">
@@ -77,11 +84,10 @@
         <aside class="panel">
             <div class="panel__body">
                 <div class="summary">
-                    <strong>Next step</strong>
-                    <p>After enrollment, open the classification page to compare a user against the trusted set for this model.</p>
+                    <strong>About this page</strong>
+                    <p>This is a personal authentication tool. Your enrollment is stored locally on this device.</p>
                 </div>
                 <div class="helper-links">
-                    <a href="/models/{{ selected_model_value }}/classify">Open classification page</a>
                     <a href="/models">Back to model selection</a>
                 </div>
             </div>
@@ -91,18 +97,63 @@
 
 <script>
     const ENROLL_DURATION_MS = 60000;
+    const POLL_INTERVAL_MS = 500;
+    const AUTH_TIMEOUT_MS = 30000;
+    const STORAGE_KEY = "gait_enrollment_{{ selected_model_value }}";
+    const MODEL_TYPE = "{{ selected_model_value }}";
+
     let enrollSamples = [];
     let enrollCollecting = false;
     let enrollTimer = null;
-    const MODEL_TYPE = "{{ selected_model_value }}";
+    let authTimer = null;
+    let permissionGranted = false;
+    let lastAuthEmbedding = null;
+    let authHistory = [];;
 
-    function showEl(id) { document.getElementById(id).style.display = ""; }
-    function hideEl(id) { document.getElementById(id).style.display = "none"; }
 
-    // Detect devicemotion support
-    if (typeof DeviceMotionEvent === "undefined") {
-        hideEl("record-ui");
-        showEl("upload-ui");
+    async function checkMotionPermission() {
+        const hasDeviceMotion = typeof DeviceMotionEvent !== "undefined";
+
+        if (!hasDeviceMotion) {
+            return false;
+        }
+
+        const hasRequestPermission = typeof DeviceMotionEvent.requestPermission === "function";
+
+        if (!hasRequestPermission) {
+            return true;
+        }
+
+        return null;
+    }
+
+    async function requestMotionPermission() {
+        try {
+            const perm = await DeviceMotionEvent.requestPermission();
+            return perm === "granted";
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function updateUI() {
+        const hasEnrollment = localStorage.getItem(STORAGE_KEY) !== null;
+        if (hasEnrollment) {
+            document.getElementById("state-enrolled").style.display = "";
+            document.getElementById("state-unenrolled").style.display = "none";
+            document.getElementById("state-fallback").style.display = "none";
+        } else {
+            const hasDeviceMotion = typeof DeviceMotionEvent !== "undefined";
+            if (hasDeviceMotion && (permissionGranted === true || permissionGranted === null)) {
+                document.getElementById("state-unenrolled").style.display = "";
+                document.getElementById("state-enrolled").style.display = "none";
+                document.getElementById("state-fallback").style.display = "none";
+            } else {
+                document.getElementById("state-fallback").style.display = "";
+                document.getElementById("state-unenrolled").style.display = "none";
+                document.getElementById("state-enrolled").style.display = "none";
+            }
+        }
     }
 
     function onEnrollMotion(e) {
@@ -120,33 +171,27 @@
             gyr_z: rot.gamma || 0,
         });
 
-        document.getElementById("record-sample-count").textContent = enrollSamples.length + " samples collected";
+        document.getElementById("enroll-sample-count").textContent = enrollSamples.length + " samples collected";
     }
 
     async function startEnrollment() {
         enrollSamples = [];
 
-        if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
-            try {
-                const perm = await DeviceMotionEvent.requestPermission();
-                if (perm !== "granted") {
-                    hideEl("record-ui");
-                    showEl("upload-ui");
-                    return;
-                }
-            } catch (err) {
-                hideEl("record-ui");
-                showEl("upload-ui");
+        if (permissionGranted !== true) {
+            const perm = await requestMotionPermission();
+            if (!perm) {
+                showEnrollError("Motion sensor permission denied. Please enable it in settings.");
                 return;
             }
+            permissionGranted = true;
         }
 
         enrollCollecting = true;
-        hideEl("record-home");
-        hideEl("record-done");
-        showEl("record-collecting");
-        document.getElementById("record-progress").style.width = "0%";
-        document.getElementById("record-countdown").textContent = "60s remaining";
+        document.getElementById("enroll-btn").disabled = true;
+        document.getElementById("enroll-status").style.display = "";
+        document.getElementById("enroll-error").style.display = "none";
+        document.getElementById("enroll-progress").style.width = "0%";
+        document.getElementById("enroll-countdown").textContent = "60s remaining";
         window.addEventListener("devicemotion", onEnrollMotion);
 
         const startTime = Date.now();
@@ -154,8 +199,8 @@
             const elapsed = Date.now() - startTime;
             const remaining = Math.max(0, ENROLL_DURATION_MS - elapsed);
             const pct = Math.min(100, (elapsed / ENROLL_DURATION_MS) * 100);
-            document.getElementById("record-progress").style.width = pct + "%";
-            document.getElementById("record-countdown").textContent = Math.ceil(remaining / 1000) + "s remaining";
+            document.getElementById("enroll-progress").style.width = pct + "%";
+            document.getElementById("enroll-countdown").textContent = Math.ceil(remaining / 1000) + "s remaining";
 
             if (elapsed >= ENROLL_DURATION_MS) {
                 clearInterval(enrollTimer);
@@ -164,16 +209,22 @@
         }, 500);
     }
 
+    function showEnrollError(msg) {
+        document.getElementById("enroll-error-msg").textContent = msg;
+        document.getElementById("enroll-error").style.display = "";
+        document.getElementById("enroll-status").style.display = "none";
+        document.getElementById("enroll-btn").disabled = false;
+        document.getElementById("enroll-btn").textContent = "Start Enrollment";
+    }
+
     async function finishEnrollment() {
         enrollCollecting = false;
         window.removeEventListener("devicemotion", onEnrollMotion);
-        hideEl("record-collecting");
+        document.getElementById("enroll-status").style.display = "none";
+        document.getElementById("enroll-btn").disabled = false;
 
-        const n = enrollSamples.length;
-        if (n === 0) {
-            document.getElementById("record-done-msg").textContent = "No samples collected. Make sure motion is enabled.";
-            showEl("record-done");
-            showEl("record-home");
+        if (enrollSamples.length === 0) {
+            showEnrollError("No samples collected. Make sure motion is enabled.");
             return;
         }
 
@@ -184,18 +235,170 @@
                 body: JSON.stringify({ samples: enrollSamples }),
             });
             if (resp.ok) {
-                const html = await resp.text();
-                document.getElementById("status-message").outerHTML = html;
+                const data = await resp.json();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.embedding));
+                updateUI();
             } else {
-                document.getElementById("record-done-msg").textContent = "Server error: " + resp.status;
-                showEl("record-done");
-                showEl("record-home");
+                showEnrollError("Server error: " + resp.status);
             }
         } catch (err) {
-            document.getElementById("record-done-msg").textContent = "Network error: " + err.message;
-            showEl("record-done");
-            showEl("record-home");
+            showEnrollError("Network error: " + err.message);
         }
     }
+
+    async function startAuthenticate() {
+        const embedding = localStorage.getItem(STORAGE_KEY);
+        if (!embedding) {
+            alert("No enrollment found");
+            return;
+        }
+
+        if (permissionGranted !== true) {
+            const perm = await requestMotionPermission();
+            if (!perm) {
+                showAuthResult("Permission denied", "Motion sensor permission required. Please enable it in settings.");
+                return;
+            }
+            permissionGranted = true;
+        }
+
+        const authenticateBtn = document.getElementById("authenticate-btn");
+        const clearBtn = document.getElementById("clear-btn");
+        authenticateBtn.disabled = true;
+        clearBtn.disabled = true;
+        authenticateBtn.textContent = "Authenticating...";
+
+        document.getElementById("auth-result").style.display = "none";
+
+        enrollSamples = [];
+        enrollCollecting = true;
+        const startTime = Date.now();
+        window.addEventListener("devicemotion", onEnrollMotion);
+
+        authTimer = setInterval(async () => {
+            const elapsed = Date.now() - startTime;
+
+            if (enrollSamples.length > 100 || elapsed > AUTH_TIMEOUT_MS) {
+                clearInterval(authTimer);
+                enrollCollecting = false;
+                window.removeEventListener("devicemotion", onEnrollMotion);
+
+                if (enrollSamples.length === 0) {
+                    showAuthResult("No samples collected", "Could not collect motion data.");
+                    authenticateBtn.disabled = false;
+                    clearBtn.disabled = false;
+                    authenticateBtn.textContent = "Authenticate";
+                    return;
+                }
+
+                try {
+                    const resp = await fetch("/models/" + MODEL_TYPE + "/authenticate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            samples: enrollSamples,
+                            reference_embedding: JSON.parse(embedding),
+                        }),
+                    });
+                    if (resp.ok) {
+                        const result = await resp.json();
+                        lastAuthEmbedding = result.embedding;
+                        authHistory.push(result.embedding);
+                        if (authHistory.length > 5) {
+                            authHistory.shift();
+                        }
+                        const confidence = Math.round(result.confidence * 100);
+                        if (result.is_match) {
+                            showAuthResult("Authenticated", "We recognized your gait.", confidence);
+                        } else {
+                            showAuthResult("✗ Not recognized", "Your gait doesn't match your enrollment.", confidence);
+                        }
+                    } else {
+                        showAuthResult("Error", "Server error: " + resp.status);
+                    }
+                } catch (err) {
+                    showAuthResult("Error", "Network error: " + err.message);
+                }
+
+                authenticateBtn.disabled = false;
+                clearBtn.disabled = false;
+                authenticateBtn.textContent = "Authenticate";
+            }
+        }, POLL_INTERVAL_MS);
+    }
+
+    function showAuthResult(title, msg, confidence) {
+        document.getElementById("auth-result-title").textContent = title;
+        document.getElementById("auth-result-msg").textContent = msg;
+        if (typeof confidence !== "undefined" && confidence !== null) {
+            document.getElementById("auth-confidence-value").textContent = confidence + "%";
+            document.getElementById("auth-confidence").style.display = "";
+        } else {
+            document.getElementById("auth-confidence").style.display = "none";
+        }
+        document.getElementById("embedding-plot").style.display = "none";
+        document.getElementById("auth-result").style.display = "";
+    }
+
+    function showEmbeddingPlot() {
+        if (!lastAuthEmbedding) {
+            alert("No embedding data available. Try authenticating again.");
+            return;
+        }
+
+        const embedding = localStorage.getItem(STORAGE_KEY);
+        if (!embedding) {
+            alert("No enrollment embedding found");
+            return;
+        }
+
+        document.getElementById("show-embedding-btn").disabled = true;
+        document.getElementById("show-embedding-btn").textContent = "Loading...";
+
+        const referenceEmbedding = JSON.parse(embedding);
+
+        fetch("/embeddings/plot", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                reference_embedding: referenceEmbedding,
+                auth_history: authHistory,
+            }),
+        })
+            .then(resp => {
+                if (resp.ok) {
+                    return resp.blob();
+                }
+                throw new Error("Failed to generate plot");
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                document.getElementById("embedding-image").src = url;
+                document.getElementById("embedding-plot").style.display = "";
+                document.getElementById("show-embedding-btn").disabled = false;
+                document.getElementById("show-embedding-btn").textContent = "Show Embedding Comparison";
+            })
+            .catch(err => {
+                alert("Error generating plot: " + err.message);
+                document.getElementById("show-embedding-btn").disabled = false;
+                document.getElementById("show-embedding-btn").textContent = "Show Embedding Comparison";
+            });
+    }
+
+    function hideEmbeddingPlot() {
+        document.getElementById("embedding-plot").style.display = "none";
+    }
+
+    function clearEnrollment() {
+        if (confirm("Clear your enrollment? You'll need to enroll again to authenticate.")) {
+            localStorage.removeItem(STORAGE_KEY);
+            updateUI();
+        }
+    }
+
+    (async function initPage() {
+        permissionGranted = await checkMotionPermission();
+        updateUI();
+    })();
 </script>
 {% endblock %}

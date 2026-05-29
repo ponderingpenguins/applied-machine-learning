@@ -163,6 +163,7 @@ h2 { margin: 0 0 8px; font-size: 1.3rem; }
     flex-wrap: wrap;
     gap: 12px;
 }
+button,
 .button-row button,
 .button-row a {
     border: 0;
@@ -178,13 +179,26 @@ h2 { margin: 0 0 8px; font-size: 1.3rem; }
     align-items: center;
     justify-content: center;
 }
+button.primary {
+    background: var(--accent);
+    color: white;
+}
+button.secondary {
+    background: #e7edf3;
+    color: var(--ink);
+}
 .button-row button.secondary,
 .button-row a.secondary {
     background: #e7edf3;
     color: var(--ink);
 }
+button:hover,
 .button-row button:hover,
 .button-row a:hover { filter: brightness(1.03); }
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 .helper-links {
     display: grid;
     gap: 10px;

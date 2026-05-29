@@ -16,6 +16,7 @@ import logging
 import os
 import pickle
 import sys
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -36,9 +37,10 @@ from gait_classification.data.gait_data import (
     participant_split,
 )
 from gait_classification.eval import compute_far_frr_eer
+from gait_classification.hf_utils import upload_model_from_training
 from gait_classification.models.models import construct_model
 from gait_classification.triplet_loss import OnlineTripletLoss
-from gait_classification.utils import TrainConfig
+from gait_classification.utils import ModelType, TrainConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -322,13 +324,25 @@ def train_on_split(
         train_emb_by_pid = compute_embeddings(
             model, train_windows, train_labels, device, cfg.batch_size
         )
-        centroids = {
-            pid: emb.mean(axis=0) for pid, emb in train_emb_by_pid.items()
-        }
-        centroids_path = os.path.join(cfg.checkpoint_dir, f"centroids_{cfg.model_type}.pkl")
+        centroids = {pid: emb.mean(axis=0) for pid, emb in train_emb_by_pid.items()}
+        centroids_path = os.path.join(
+            cfg.checkpoint_dir, f"centroids_{cfg.model_type}.pkl"
+        )
         with open(centroids_path, "wb") as f:
             pickle.dump(centroids, f)
         logger.info("Centroids saved to %s", centroids_path)
+
+        if cfg.push_to_hf:
+            logger.info("Pushing model to Hugging Face Hub...")
+            try:
+                upload_model_from_training(
+                    model.state_dict(),
+                    ModelType(cfg.model_type),
+                    Path(cfg.checkpoint_dir),
+                )
+                logger.info("Model pushed to Hugging Face successfully!")
+            except Exception as e:
+                logger.error("Failed to push model to Hugging Face: %s", e)
 
     return {
         "train_loss": train_losses,
