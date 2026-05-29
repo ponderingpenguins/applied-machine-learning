@@ -81,13 +81,16 @@
                     <div id="state-enrolled">
                         <div class="summary">
                             <strong>You're enrolled</strong>
+                            <p id="enrollment-count" style="margin-bottom: 8px; font-size: 0.9rem; color: var(--muted);">recordings enrolled</p>
                             <p>Ready to authenticate. Hold your phone naturally and walk to verify your identity.</p>
                         </div>
                         <div class="button-row">
                             <button id="authenticate-btn" onclick="startAuthenticate()" class="primary">Authenticate</button>
+                            <button id="add-recording-btn" onclick="startEnrollment()" class="secondary">Add Recording</button>
                             <button id="menu-btn" onclick="toggleMenu()" class="secondary">⋯</button>
                         </div>
                         <div id="dev-menu">
+                            <button onclick="startEnrollment()">Add Another Recording</button>
                             <button onclick="showEmbeddingPlot()">Show Embedding Comparison</button>
                             <button onclick="clearEnrollment()">Clear Enrollment</button>
                         </div>
@@ -137,19 +140,8 @@
                     <div id="state-fallback">
                         <div class="summary">
                             <strong>Motion sensors unavailable</strong>
-                            <p>Upload a CSV file with columns: <code>acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z</code></p>
+                            <p>Please use a mobile device with motion sensors to enroll and authenticate your gait.</p>
                         </div>
-                        <form class="form-grid"
-                              hx-post="/models/{{ selected_model_value }}/encode"
-                              hx-target="#main-content"
-                              hx-swap="innerHTML"
-                              enctype="multipart/form-data">
-                            <label for="trusted_user_file">Upload CSV file</label>
-                            <input id="trusted_user_file" name="trusted_user_file" type="file" accept=".csv,.txt">
-                            <div class="button-row">
-                                <button type="submit">Enroll from file</button>
-                            </div>
-                        </form>
                     </div>
                 </div>
             </div>
@@ -182,6 +174,24 @@
     let _audioSessionUnlocked = false;
     let _lastAudioSec = -1;
 
+    function loadEnrollmentEmbeddings() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (parsed.length > 0 && typeof parsed[0] === "number") return [parsed];
+        return parsed;
+    }
+
+    function computeCentroid(embeddings) {
+        if (embeddings.length === 0) return null;
+        const dim = embeddings[0].length;
+        const centroid = new Array(dim).fill(0);
+        for (const emb of embeddings) {
+            for (let i = 0; i < dim; i++) centroid[i] += emb[i];
+        }
+        return centroid.map(v => v / embeddings.length);
+    }
+
     // Builds a minimal valid silent WAV blob — played via <audio> to switch the iOS
     // audio session from "ambient" (muted by silent switch) to "playback".
     function _makeSilentWav() {
@@ -210,9 +220,14 @@
     }
 
     function updateUI() {
-        const hasEnrollment = localStorage.getItem(STORAGE_KEY) !== null;
-        if (hasEnrollment) {
+        const embeddings = loadEnrollmentEmbeddings();
+        if (embeddings.length > 0) {
             showState("state-enrolled");
+            const countEl = document.getElementById("enrollment-count");
+            if (countEl) {
+                const count = embeddings.length;
+                countEl.textContent = `${count} recording${count === 1 ? '' : 's'} enrolled`;
+            }
         } else {
             const hasDeviceMotion = typeof DeviceMotionEvent !== "undefined";
             if (hasDeviceMotion && (permissionGranted === true || permissionGranted === null)) {
@@ -534,11 +549,12 @@
             });
             if (resp.ok) {
                 const data = await resp.json();
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.embedding));
+                const existing = loadEnrollmentEmbeddings();
+                existing.push(data.embedding);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
                 navigator.vibrate?.([100, 50, 100, 50, 300]);
                 playArpeggio([523, 659, 784], 0.5, 0.3, 0.5);
-                showEnrollmentSuccess();
-                updateUI();
+                showEnrollmentSuccess(existing.length);
             } else {
                 showError("enroll-error", "Server error: " + resp.status);
             }
@@ -547,14 +563,14 @@
         }
     }
 
-    function showEnrollmentSuccess() {
+    function showEnrollmentSuccess(recordingCount) {
         const summary = document.createElement("div");
         summary.className = "summary";
-        summary.innerHTML = "<strong>Enrolled!</strong><p>You're all set. You can now authenticate using your gait.</p>";
+        summary.innerHTML = `<strong>Recording ${recordingCount} saved</strong><p>You can add more recordings for increased accuracy, or start authenticating.</p>`;
 
         const buttonRow = document.createElement("div");
         buttonRow.className = "button-row";
-        buttonRow.innerHTML = '<button onclick="location.reload()" class="primary">Continue</button>';
+        buttonRow.innerHTML = '<button onclick="startEnrollment()" class="secondary">Add Another</button><button onclick="updateUI()" class="primary">Done</button>';
 
         const mainContent = document.getElementById("main-content");
         mainContent.innerHTML = "";
@@ -568,8 +584,8 @@
             ? requestMotionPermission() : null;
         unlockAudio();
 
-        const embedding = localStorage.getItem(STORAGE_KEY);
-        if (!embedding) {
+        const embeddings = loadEnrollmentEmbeddings();
+        if (embeddings.length === 0) {
             alert("No enrollment found");
             return;
         }
@@ -634,12 +650,13 @@
                     }
 
                     try {
+                        const centroid = computeCentroid(embeddings);
                         const resp = await fetch("/models/" + MODEL_TYPE + "/authenticate", {
                             method: "POST",
                             headers: {"Content-Type": "application/json"},
                             body: JSON.stringify({
                                 samples: enrollSamples,
-                                reference_embedding: JSON.parse(embedding),
+                                reference_embedding: centroid,
                             }),
                         });
                         if (resp.ok) {
@@ -665,7 +682,7 @@
 
         const bgColor = isSuccess ? "#22c55e" : "#ef4444";
         document.getElementById("result-background").style.backgroundColor = bgColor;
-        document.getElementById("result-icon").textContent = isSuccess ? "✓" : "✗";
+        document.getElementById("result-icon").textContent = isSuccess ? ":)" : ":(";
 
         if (errorMsg) {
             document.getElementById("result-confidence").textContent = "Error";
@@ -717,8 +734,8 @@
             return;
         }
 
-        const embedding = localStorage.getItem(STORAGE_KEY);
-        if (!embedding) {
+        const embeddings = loadEnrollmentEmbeddings();
+        if (embeddings.length === 0) {
             alert("No enrollment embedding found");
             return;
         }
@@ -727,7 +744,7 @@
         const modalEl = document.getElementById("embedding-plot-modal");
         if (modalEl) modalEl.classList.add("show");
 
-        const referenceEmbedding = JSON.parse(embedding);
+        const referenceEmbedding = computeCentroid(embeddings);
 
         fetch("/embeddings/plot", {
             method: "POST",

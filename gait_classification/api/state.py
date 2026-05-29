@@ -4,7 +4,6 @@ from pathlib import Path
 import torch
 
 from gait_classification.hf_utils import (
-    download_centroids,
     download_model_checkpoint,
     download_scaler,
 )
@@ -12,13 +11,9 @@ from gait_classification.models.models import construct_model
 from gait_classification.utils import ModelType, TrainConfig
 
 _model_cache = {}
-trusted_users = {
-    ModelType.TRANSFORMER: [],
-    ModelType.LSTM: [],
-}
 
 
-def get_model_scaler_centroids(model_type: ModelType):
+def get_model_and_scaler(model_type: ModelType):
     cache_key = f"{model_type.value}_model"
     if cache_key in _model_cache:
         return _model_cache[cache_key]
@@ -26,7 +21,7 @@ def get_model_scaler_centroids(model_type: ModelType):
     checkpoints_dir = Path(__file__).parent.parent / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-    # Special handling for FFT+centroids (no neural model)
+    # Special handling for FFT (no neural model)
     if model_type == ModelType.FFT_CENTROIDS:
         try:
             fft_scaler_path = checkpoints_dir / "scaler_fft.pkl"
@@ -35,15 +30,7 @@ def get_model_scaler_centroids(model_type: ModelType):
         except Exception:
             raise FileNotFoundError(f"FFT scaler not found at {fft_scaler_path}")
 
-        fft_centroids = {}
-        try:
-            fft_centroids_path = checkpoints_dir / "centroids_fft_centroids.pkl"
-            with open(fft_centroids_path, "rb") as f:
-                fft_centroids = pickle.load(f)
-        except Exception:
-            raise FileNotFoundError(f"FFT centroids not found")
-
-        result = (None, scaler, fft_centroids)
+        result = (None, scaler)
         _model_cache[cache_key] = result
         return result
 
@@ -93,18 +80,6 @@ def get_model_scaler_centroids(model_type: ModelType):
         with open(checkpoints_dir / "scaler.pkl", "rb") as f:
             scaler = pickle.load(f)
 
-    # Try to load centroids from HF, fallback to local
-    centroids = {}
-    try:
-        centroids_path = download_centroids(model_type, cache_dir=checkpoints_dir)
-        with open(centroids_path, "rb") as f:
-            centroids = pickle.load(f)
-    except Exception:
-        centroids_path = checkpoints_dir / f"centroids_{model_type.value}.pkl"
-        if centroids_path.exists():
-            with open(centroids_path, "rb") as f:
-                centroids = pickle.load(f)
-
-    result = (model, scaler, centroids)
+    result = (model, scaler)
     _model_cache[cache_key] = result
     return result

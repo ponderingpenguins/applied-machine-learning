@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from gait_classification.api.routes.ml import router as ml_router
 from gait_classification.api.routes.web import router as web_router
-from gait_classification.api.state import get_model_scaler_centroids
+from gait_classification.api.state import get_model_and_scaler
 from gait_classification.utils import ModelType
 
 
@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     # Startup: preload available models
     for model_type in ModelType:
         try:
-            get_model_scaler_centroids(model_type)
+            get_model_and_scaler(model_type)
             print(f"Preloaded {model_type.value} model")
         except FileNotFoundError as e:
             print(f"Skipping {model_type.value} model: {e}")

@@ -10,7 +10,7 @@ from sklearn.manifold import TSNE
 
 from scipy.fft import rfft as scipy_rfft
 
-from gait_classification.api.state import get_model_scaler_centroids
+from gait_classification.api.state import get_model_and_scaler
 from gait_classification.utils import ModelType
 
 router = APIRouter()
@@ -83,7 +83,7 @@ def _build_embedding_from_gait_data(
     model_type: ModelType,
     gait_data: GaitData,
 ) -> list[float]:
-    model, scaler, _ = get_model_scaler_centroids(model_type)
+    model, scaler = get_model_and_scaler(model_type)
 
     samples = [
         [s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z]
@@ -115,50 +115,9 @@ async def encode_from_recording(model_type: ModelType, data: GaitData):
     return {"embedding": embedding}
 
 
-@router.post("/models/{model_type}/classify")
-async def classify_user(model_type: ModelType, data: GaitData):
-    model, scaler, centroids = get_model_scaler_centroids(model_type)
-
-    samples = [
-        [s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z] for s in data.samples
-    ]
-    arr = np.array(samples, dtype=np.float32)
-
-    # Handle FFT centroids separately
-    if model_type == ModelType.FFT_CENTROIDS:
-        embedding_np = _fft_embedding_from_raw(arr, scaler)
-    else:
-        arr = scaler.transform(arr)
-        tensor = torch.tensor(arr).unsqueeze(0)
-        with torch.no_grad():
-            embedding = model(tensor)
-        embedding_np = embedding.cpu().numpy()[0]
-
-    if centroids:
-        distances = {
-            pid: float(np.linalg.norm(embedding_np - centroid))
-            for pid, centroid in centroids.items()
-        }
-        best_pid = min(distances.items(), key=lambda x: x[1])[0]
-        best_dist = distances[best_pid]
-        classify_threshold = 0.5 if model_type != ModelType.FFT_CENTROIDS else 5.0
-        confidence = float(max(0.0, min(1.0, 1.0 - best_dist / (2.0 * classify_threshold))))
-        result_text = f"Person {best_pid}"
-    else:
-        embedding_norm = float(np.linalg.norm(embedding_np))
-        confidence = min(1.0, embedding_norm)
-        result_text = "Gait Pattern"
-
-    return {
-        "result": result_text,
-        "confidence": confidence,
-        "samples_processed": len(data.samples),
-    }
-
-
 @router.post("/models/{model_type}/authenticate")
 async def authenticate_user(model_type: ModelType, data: ClassifyWithReference):
-    model, scaler, _ = get_model_scaler_centroids(model_type)
+    model, scaler = get_model_and_scaler(model_type)
 
     samples = [
         [s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z] for s in data.samples
