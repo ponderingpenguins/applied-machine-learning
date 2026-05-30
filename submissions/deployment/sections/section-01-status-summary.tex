@@ -1,6 +1,8 @@
 \section{What Is Implemented}
 
-The project, as discussed with the TA, is in a deployed state. The repository is public and can be opened directly at \url{https://github.com/ponderingpenguins/applied-machine-learning}. In the current state, it is a deep learning-based gait authentication system using IMU sensor data. The current implementation includes a training pipeline, a deployed FastAPI API, and a web interface for inspecting and using the models. The root \texttt{README.md} documents how to install dependencies and launch the API locally with \texttt{uvicorn} or Docker Compose.
+The project, as discussed with the TA, is in a deployed state. The repository is public and can be opened directly at \url{https://github.com/ponderingpenguins/applied-machine-learning}. It is hosted live at \url{https://gait-authentication.sigurdurhaukur.com} with a FastAPI backend and an interactive web interface. The API documentation is available at \url{https://gait-authentication.sigurdurhaukur.com/docs}. We reccomend trying the live deployment to see the full functionality using any smartphone with a gyroscope and accelerometer (most modern smartphones have these sensors). The web interface allows you to select a model, record your gait data in real time, and see the authentication results with visual feedback.
+
+In the current state, it is a deep learning-based gait authentication system using IMU sensor data. The current implementation includes a training pipeline, a deployed FastAPI API, and a web interface for inspecting and using the models. The root \texttt{README.md} documents how to install dependencies and launch the API locally with \texttt{uvicorn} or Docker Compose.
 
 \subsection*{Core ML Pipeline}
 \begin{itemize}
