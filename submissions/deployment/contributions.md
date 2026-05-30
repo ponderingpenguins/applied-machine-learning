@@ -1,33 +1,34 @@
-Sigurdur Haukur Birgisson — ML pipeline & backend
-  - ML pipeline foundation: triplet mining, online triplet loss, k-fold
-  training
-  - Data pipeline: preprocessing filters (Butterworth, Kalman, FFT),
-  windowing, standardization
-  - Model architectures: LSTM and Transformer implementations
-  - Backend/frontend integration: FastAPI routes, web UI, model
-  inference
-  - DevOps: Docker containerization, Hugging Face integration
+# Contributions
 
-Peter Meeus — ML training & evaluation
-  - K-fold cross-validation implementation
-  - Evaluation metrics: FAR, FRR, EER computation for unseen
-  participants
-  - Model parameter tuning and finetuning workflow
-  - CosFace loss integration (in collaboration with tijje)
-  - Training visualization and loss/embedding analysis
-  - Dataset handling fixes and preprocessing optimizations
-  - DevOps: pre-commit hooks, code formatting, dependency management
+## Sigurdur Haukur Birgisson
 
-Efe — Web API & frontend
-  - Initial FastAPI endpoint design and setup
-  - Template system and HTML frontend pages
-  - API webpage and user interface development
-  - Feature separation: model pages, user enrollment, classification
-  logic
-  - API testing framework
-  - Filter experimentation and visualization
+- ML pipeline foundation: triplet mining, online triplet loss, and k-fold training.
+- Data pipeline: preprocessing filters, windowing, and standardization.
+- Model architectures: LSTM and Transformer implementations.
+- Backend/frontend integration: FastAPI routes, web UI, and model inference.
+- DevOps: Docker containerization and Hugging Face integration.
 
-Tijje — CosFace loss implementation
-  - Custom linear layer for CosFace loss
-  - CosFace loss function implementation and integration
-  - Alternative loss function support alongside triplet loss
+## Peter Meeus
+
+- K-fold cross-validation implementation.
+- Evaluation metrics: FAR, FRR, and EER computation for unseen participants.
+- Model parameter tuning and finetuning workflow.
+- CosFace loss integration, in collaboration with Tijje.
+- Training visualization and loss/embedding analysis.
+- Dataset handling fixes and preprocessing optimizations.
+- DevOps: pre-commit hooks, code formatting, and dependency management.
+
+## Efe
+
+- Initial FastAPI endpoint design and setup.
+- Template system and HTML frontend pages.
+- API webpage and user interface development.
+- Feature separation: model pages, user enrollment, and classification logic.
+- API testing framework.
+- Filter experimentation and visualization.
+
+## Tijje
+
+- Custom linear layer for CosFace loss.
+- CosFace loss function implementation and integration.
+- Alternative loss function support alongside triplet loss.

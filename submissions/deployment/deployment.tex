@@ -1,0 +1,30 @@
+\documentclass[10pt]{article}
+\usepackage[a4paper]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8\baselineskip}
+
+\title{Deployment Submission: Gait Classification API}
+\author{Efe Ozbal - S5996821 \\
+        Sigurdur Haukur Birgisson - S5982960 \\
+        Tijje Steeman - S5333644 \\
+        Will Meeus - S5863708}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\newcommand{\deploymentinput}[1]{%
+	\IfFileExists{sections/#1}{\input{sections/#1}}{\input{submissions/deployment/sections/#1}}%
+}
+
+\deploymentinput{section-01-status-summary.tex}
+\deploymentinput{section-02-validation-evidence.tex}
+\deploymentinput{section-03-api-documentation.tex}
+\deploymentinput{section-04-submission-artifacts.tex}
+\deploymentinput{section-05-contributions.tex}
+
+\end{document}

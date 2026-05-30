@@ -1,12 +1,14 @@
-url: git@github.com:ponderingpenguins/applied-machine-learning.git
+# Project Status Summary
 
-Project Status Summary
+Repository: [ponderingpenguins/applied-machine-learning](https://github.com/ponderingpenguins/applied-machine-learning)
 
-Gait Classification System — A deep learning-based gait authentication system using IMU sensor data with the following implemented components:
+The project is a deep learning-based gait authentication system using IMU sensor data. The current implementation includes a training pipeline, a deployed FastAPI API, and a web interface for inspecting and using the models.
+
+## Implemented Components
 
 Core ML Pipeline:
 
-- Dual model architectures (LSTM and Transformer) for gait classification using triplet loss
+- Dual model architectures (LSTM and Transformer) for gait classification, with embedding-based inference.
 - K-fold cross-validation training pipeline with configurable preprocessing (Butterworth, Kalman, FFT filters)
 - Centroid-based classification with embedding extraction
 - Automatic model storage and retrieval via Hugging Face Hub
@@ -31,3 +33,11 @@ Development & Quality:
 - Code formatted with black
 - Dependency management via uv package manager
 - Multiple utility scripts (training curves plotting, centroid computation, HF model management)
+
+
+
+## Development Notes
+
+- Pre-commit hooks are configured, including flake8 and formatting checks.
+- The project uses `uv` for dependency management.
+- Supporting scripts exist for training curves, centroid computation, and Hugging Face model management.

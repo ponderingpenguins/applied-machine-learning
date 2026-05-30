@@ -1,0 +1,26 @@
+\section{API Documentation}
+
+The API is documented through FastAPI's interactive interface at \url{http://localhost:8000/docs}. The screenshot below shows the endpoint groups and the Pydantic models that define the request and response shapes.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\linewidth]{figures/api-screenshot.png}
+    \caption{FastAPI documentation showing the endpoints and schema definitions.}
+\end{figure}
+
+The main request models are:
+
+\begin{itemize}
+    \item \texttt{GaitData}: a list of IMU sensor samples with accelerometer and gyroscope values.
+    \item \texttt{ClassifyWithReference}: gait samples plus a reference embedding for authentication.
+    \item \texttt{EmbeddingVisualization}: a reference embedding and authentication history for plotting.
+\end{itemize}
+
+The main response shapes are:
+
+\begin{itemize}
+    \item \texttt{/models/\{model\_type\}/encode-recording}: returns an \texttt{embedding} vector.
+    \item \texttt{/models/\{model\_type\}/authenticate}: returns a match decision, distance, threshold, confidence, samples processed, and the computed embedding.
+    \item \texttt{/embeddings/plot}: returns a PNG visual.
+\end{itemize}
+
