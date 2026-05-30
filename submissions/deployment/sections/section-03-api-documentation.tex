@@ -1,3 +1,4 @@
+\newpage
 \section{API Documentation}
 
 The API is documented through FastAPI's interactive interface at \url{http://localhost:8000/docs}. The screenshot below shows the endpoint groups and the Pydantic models that define the request and response shapes.
@@ -24,3 +25,10 @@ The main response shapes are:
     \item \texttt{/embeddings/plot}: returns a PNG visual.
 \end{itemize}
 
+The request/response screenshot below shows a successful API call made with \texttt{curl} and the returned JSON response.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\linewidth]{figures/curl-request-screenshot.png}
+    \caption{Example API request and successful response.}
+\end{figure}
