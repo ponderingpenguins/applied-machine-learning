@@ -74,7 +74,9 @@ class TrainConfig:
     loss_type: str = "cosface"
 
     seed: int = 67  # Six seven...
-    fft_threshold: float = 0.95  # Chosen in the preliminary data look notebook by plotting the t-sne of the FFT features to see which threshold gives the best separation.
+    fft_threshold: float = (
+        0.95  # Chosen in the preliminary data look notebook by plotting the t-sne of the FFT features to see which threshold gives the best separation.
+    )
     # Would be nice to use the elbow method.
     n_folds: int = 5
 

@@ -35,7 +35,7 @@ def _fft_embedding_from_raw(arr: np.ndarray, scaler) -> np.ndarray:
             feats.extend(np.abs(yf[:FFT_BINS_PER_CHANNEL]))
         return np.array(feats[:n_keep], dtype=np.float32)
 
-    windows = [arr[s:s + FFT_SEQ_LEN] for s in range(0, len(arr) - FFT_SEQ_LEN + 1, FFT_SEQ_LEN)]
+    windows = [arr[s : s + FFT_SEQ_LEN] for s in range(0, len(arr) - FFT_SEQ_LEN + 1, FFT_SEQ_LEN)]
     if not windows:
         padded = np.pad(arr, ((0, FFT_SEQ_LEN - len(arr)), (0, 0)))
         windows = [padded]
@@ -49,6 +49,7 @@ class SensorSample(BaseModel):
 
     Represents one sample of acceleration (3 axes) and gyroscope (3 axes) data.
     """
+
     acc_x: float = Field(..., description="Acceleration in X direction (m/s²)")
     acc_y: float = Field(..., description="Acceleration in Y direction (m/s²)")
     acc_z: float = Field(..., description="Acceleration in Z direction (m/s²)")
@@ -76,6 +77,7 @@ class GaitData(BaseModel):
     Contains multiple timesteps of acceleration and gyroscope data.
     At least one sample is required.
     """
+
     samples: list[SensorSample] = Field(
         ...,
         description="List of sensor readings. Minimum 1 sample required.",
@@ -114,6 +116,7 @@ class ClassifyWithReference(BaseModel):
     Computes an embedding from the input samples and compares it to the
     reference embedding using L2 distance and a learned threshold.
     """
+
     samples: list[SensorSample] = Field(
         ...,
         description="Gait sensor readings to authenticate",
@@ -149,6 +152,7 @@ class EmbeddingVisualization(BaseModel):
     Creates a 2D scatter plot showing the enrollment point and all
     authentication attempts in embedding space.
     """
+
     reference_embedding: list[float] = Field(
         ...,
         description="The enrollment/reference embedding",
@@ -199,10 +203,7 @@ def _build_embedding_from_gait_data(
 ) -> list[float]:
     model, scaler = get_model_and_scaler(model_type)
 
-    samples = [
-        [s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z]
-        for s in gait_data.samples
-    ]
+    samples = [[s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z] for s in gait_data.samples]
     arr = np.array(samples, dtype=np.float32)
 
     # Handle FFT centroids separately
@@ -256,9 +257,7 @@ async def encode_from_recording(
     enrollment or compared against reference embeddings for authentication.
     """
     if not data.samples:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No samples provided"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No samples provided")
 
     embedding = _build_embedding_from_gait_data(model_type, data)
     return {"embedding": embedding}
@@ -317,9 +316,7 @@ async def authenticate_user(
     """
     model, scaler = get_model_and_scaler(model_type)
 
-    samples = [
-        [s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z] for s in data.samples
-    ]
+    samples = [[s.acc_x, s.acc_y, s.acc_z, s.gyr_x, s.gyr_y, s.gyr_z] for s in data.samples]
     arr = np.array(samples, dtype=np.float32)
 
     # Handle FFT centroids separately
@@ -368,7 +365,9 @@ async def authenticate_user(
     },
 )
 async def plot_embeddings(
-    data: EmbeddingVisualization = Body(..., description="Reference enrollment and authentication attempt embeddings"),
+    data: EmbeddingVisualization = Body(
+        ..., description="Reference enrollment and authentication attempt embeddings"
+    ),
 ):
     """Generate a t-SNE visualization of authentication history in embedding space.
 
@@ -442,9 +441,7 @@ async def plot_embeddings(
         )
 
     # Add threshold info as text
-    threshold_text = (
-        f"Match threshold: {threshold}\n(Solid border = match, Gray = no match)"
-    )
+    threshold_text = f"Match threshold: {threshold}\n(Solid border = match, Gray = no match)"
     ax.text(
         0.02,
         0.98,

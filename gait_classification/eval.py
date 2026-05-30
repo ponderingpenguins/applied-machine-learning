@@ -46,13 +46,9 @@ def _compute_single_resample_metrics(
     distances_unknown = np.asarray(distances_unknown, dtype=float)
 
     if len(distances_known) == 0 or len(distances_unknown) == 0:
-        raise ValueError(
-            "Open-set evaluation requires both known probe trials and unknown trials."
-        )
+        raise ValueError("Open-set evaluation requires both known probe trials and unknown trials.")
 
-    thresholds = np.linspace(
-        0, np.max(np.concatenate([distances_known, distances_unknown])), 100
-    )
+    thresholds = np.linspace(0, np.max(np.concatenate([distances_known, distances_unknown])), 100)
     fars = []
     frrs = []
 
@@ -98,7 +94,9 @@ def compute_far_frr_eer(
 
     known_pids = np.array(sorted(shuffled_known[:split_idx]))
     unknown_pids = np.array(sorted(shuffled_known[split_idx:]))
-    remaining_pids = np.array(sorted([pid for pid in test_emb_by_pid.keys() if pid not in eligible_known_pids]))
+    remaining_pids = np.array(
+        sorted([pid for pid in test_emb_by_pid.keys() if pid not in eligible_known_pids])
+    )
     unknown_pids = np.concatenate([unknown_pids, remaining_pids])
     if len(unknown_pids) == 0:
         raise ValueError(

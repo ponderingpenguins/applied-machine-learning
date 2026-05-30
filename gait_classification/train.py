@@ -15,10 +15,8 @@ python train.py max_samples=500 batch_size=128 model_type=lstm 'preprocess_filte
 import copy
 import json
 import logging
-import pickle
 import os
 import sys
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -40,12 +38,10 @@ from gait_classification.data.gait_data import (
     participant_split,
 )
 from gait_classification.eval import compute_far_frr_eer
-from gait_classification.hf_utils import upload_model_from_training
 from gait_classification.models.cosface_head import CosFaceHead
 from gait_classification.models.models import construct_model
 from gait_classification.triplet_loss import OnlineTripletLoss
-from gait_classification.cosface_loss import CosFaceLoss
-from gait_classification.utils import LossType, TrainConfig, ModelType, format_sectioned_summary
+from gait_classification.utils import LossType, TrainConfig, format_sectioned_summary
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,7 +58,7 @@ def _run_epoch(
     optimizer=None,
     device: torch.device = None,
     train: bool = False,
-    loss_type: str = LossType.TRIPLET
+    loss_type: str = LossType.TRIPLET,
 ) -> float:
     """Run a single epoch with online semi-hard triplet mining."""
     total_loss = 0.0
@@ -79,11 +75,14 @@ def _run_epoch(
             if loss_type == LossType.COSFACE:
                 loss = criterion(model(windows), labels.long())
             else:
-                embeddings = model.get_embeddings(windows) if isinstance(model, CosFaceHead) else model(windows)
+                embeddings = (
+                    model.get_embeddings(windows)
+                    if isinstance(model, CosFaceHead)
+                    else model(windows)
+                )
                 loss, n_triplets = criterion(embeddings, labels.long())
                 if n_triplets == 0:
                     continue
-
 
             if train:
                 optimizer.zero_grad()
@@ -109,28 +108,32 @@ def compute_embeddings(
 ) -> dict[int, np.ndarray]:
     """Compute embeddings for all windows, grouped by participant."""
     windows_tensor = torch.tensor(windows, dtype=torch.float32)
-    loader = DataLoader(
-        windows_tensor, batch_size=batch_size, shuffle=False, num_workers=0
-    )
+    loader = DataLoader(windows_tensor, batch_size=batch_size, shuffle=False, num_workers=0)
 
     if len(windows) == 0:
         return {}
 
     with torch.inference_mode():
-        embeddings = torch.cat(
-            [
-                (model.get_embeddings(batch.to(device)) if isinstance(model, CosFaceHead) else model(batch.to(device)))
-                for batch in loader
-            ],
-            dim=0,
-        ).cpu().numpy()
+        embeddings = (
+            torch.cat(
+                [
+                    (
+                        model.get_embeddings(batch.to(device))
+                        if isinstance(model, CosFaceHead)
+                        else model(batch.to(device))
+                    )
+                    for batch in loader
+                ],
+                dim=0,
+            )
+            .cpu()
+            .numpy()
+        )
 
     return {pid: embeddings[labels == pid] for pid in np.unique(labels)}
 
 
-def summarize_fold_histories(
-    fold_histories: list[dict[str, list[float]]]
-) -> dict[str, object]:
+def summarize_fold_histories(fold_histories: list[dict[str, list[float]]]) -> dict[str, object]:
     """Compute mean, std, and SEM curves across fold histories."""
 
     def _mean_std_sem(curves: list[np.ndarray], prefix: str) -> dict[str, list[float]]:
@@ -151,7 +154,10 @@ def summarize_fold_histories(
         if "val_eer" in history and len(history["val_eer"]) > 0
     ]
 
-    summary: dict[str, object] = {"n_folds": len(fold_histories), **_mean_std_sem(train_curves, "train_loss")}
+    summary: dict[str, object] = {
+        "n_folds": len(fold_histories),
+        **_mean_std_sem(train_curves, "train_loss"),
+    }
 
     if val_eer_curves:
         summary.update(_mean_std_sem(val_eer_curves, "val_eer"))
@@ -219,14 +225,10 @@ def train_on_split(
         logger.info("Using CosFace loss for training.")
         unique_train_pids = sorted(np.unique(train_pids))
         pid_to_class_idx = {pid: i for i, pid in enumerate(unique_train_pids)}
-        train_labels_mapped = torch.tensor(
-            [pid_to_class_idx[pid] for pid in train_labels]
-        )
+        train_labels_mapped = torch.tensor([pid_to_class_idx[pid] for pid in train_labels])
 
         train_ds = GaitWindowDataset(train_windows, train_labels_mapped)
-        model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(
-            device
-        )
+        model = CosFaceHead(base_model, cfg.embedding_size, len(unique_train_pids)).to(device)
 
         train_criterion = CosFaceLoss(margin=cfg.cosface_margin, scale=cfg.cosface_scale)
     else:
@@ -238,9 +240,7 @@ def train_on_split(
     train_labels = train_ds.labels.numpy()
     class_counts = np.bincount(train_labels)
     weights = 1.0 / class_counts[train_labels]
-    train_sampler = WeightedRandomSampler(
-        weights.tolist(), len(train_labels), replacement=True
-    )
+    train_sampler = WeightedRandomSampler(weights.tolist(), len(train_labels), replacement=True)
     train_loader = DataLoader(
         train_ds,
         batch_size=cfg.batch_size,
@@ -338,9 +338,7 @@ def train_on_split(
     logger.info("Training complete. Saving history for this run...")
     os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     history_fname = (
-        f"training_history_fold{fold_idx}.json"
-        if fold_idx is not None
-        else "training_history.json"
+        f"training_history_fold{fold_idx}.json" if fold_idx is not None else "training_history.json"
     )
     history_path = os.path.join(cfg.checkpoint_dir, history_fname)
     history = {
@@ -375,9 +373,7 @@ def train_on_split(
         logger.info("Test EER: %.2f%%", eer * 100)
 
     if save_model:
-        final_model_path = os.path.join(
-            cfg.checkpoint_dir, f"final_model_{cfg.model_type}.pt"
-        )
+        final_model_path = os.path.join(cfg.checkpoint_dir, f"final_model_{cfg.model_type}.pt")
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
@@ -398,6 +394,8 @@ def train_on_split(
         logger.info("Final model saved to %s", final_model_path)
 
     return history
+
+
 def run_training(cfg: TrainConfig) -> None:
     """train the model"""
     logger.info("")
@@ -501,9 +499,7 @@ def run_training(cfg: TrainConfig) -> None:
 
         if fold_histories:
             cv_summary = summarize_fold_histories(fold_histories)
-            cv_summary_path = os.path.join(
-                cfg.checkpoint_dir, "training_history_cv_mean.json"
-            )
+            cv_summary_path = os.path.join(cfg.checkpoint_dir, "training_history_cv_mean.json")
             os.makedirs(cfg.checkpoint_dir, exist_ok=True)
             import json
 

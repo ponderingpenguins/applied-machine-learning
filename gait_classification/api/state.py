@@ -40,9 +40,7 @@ def get_model_and_scaler(model_type: ModelType):
 
     # Standard neural model loading
     try:
-        checkpoint_path = download_model_checkpoint(
-            model_type, cache_dir=checkpoints_dir
-        )
+        checkpoint_path = download_model_checkpoint(model_type, cache_dir=checkpoints_dir)
     except Exception as e:
         print(f"Failed to download model from HF: {e}, trying local fallback...")
         if model_type.value == "transformer":
@@ -50,9 +48,7 @@ def get_model_and_scaler(model_type: ModelType):
         else:
             checkpoint_path = checkpoints_dir / f"best_model_{model_type.value}.pt"
         if not checkpoint_path.exists():
-            raise FileNotFoundError(
-                f"Model not found at {checkpoint_path} and HF download failed"
-            )
+            raise FileNotFoundError(f"Model not found at {checkpoint_path} and HF download failed")
 
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     dim_feedforward = checkpoint.get("transformer_dim_feedforward") or checkpoint.get(
@@ -68,9 +64,7 @@ def get_model_and_scaler(model_type: ModelType):
     # Strip wrapper prefix if checkpoint was saved from a wrapped model
     if any(k.startswith("base_model.") for k in state_dict):
         state_dict = {
-            k[len("base_model."):]: v
-            for k, v in state_dict.items()
-            if k.startswith("base_model.")
+            k[len("base_model.") :]: v for k, v in state_dict.items() if k.startswith("base_model.")
         }
     model.load_state_dict(state_dict)
     model.eval()

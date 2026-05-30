@@ -148,9 +148,9 @@ def participant_split(
     assert len(set(train_pids) & set(val_pids)) == 0, "Train and Val splits overlap!"
     assert len(set(train_pids) & set(test_pids)) == 0, "Train and Test splits overlap!"
     assert len(set(val_pids) & set(test_pids)) == 0, "Val and Test splits overlap!"
-    assert len(train_pids) + len(val_pids) + len(test_pids) == n, (
-        "Splits do not cover all participants!"
-    )
+    assert (
+        len(train_pids) + len(val_pids) + len(test_pids) == n
+    ), "Splits do not cover all participants!"
 
     return train_pids, val_pids, test_pids
 
@@ -287,7 +287,7 @@ class GaitWindowDataset(Dataset):
             labels: Array of shape (N,) with participant IDs.
         """
         self.windows = torch.tensor(windows, dtype=torch.float32)
-        
+
         if not isinstance(labels, torch.Tensor):
             self.labels = torch.tensor(labels, dtype=torch.long)
         else:
@@ -298,5 +298,3 @@ class GaitWindowDataset(Dataset):
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         return self.windows[idx], self.labels[idx]
-
-

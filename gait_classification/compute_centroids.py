@@ -1,4 +1,5 @@
 """Compute and save centroids from an existing checkpoint."""
+
 import os
 import pickle
 import sys
@@ -38,10 +39,6 @@ def main():
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
-    scaler_path = os.path.join(os.path.dirname(__file__), cfg.checkpoint_dir, "scaler.pkl")
-    with open(scaler_path, "rb") as f:
-        scaler = pickle.load(f)
-
     print("Loading and preprocessing data...")
     preprocess_functions = construct_filters(cfg)
     raw, y = load_and_preprocess_data(cfg, preprocess_functions=preprocess_functions)
@@ -63,7 +60,9 @@ def main():
     for pid in np.unique(labels):
         mask = labels == pid
         centroids[pid] = embeddings[mask].mean(axis=0)
-        print(f"  Person {pid}: {(mask).sum()} windows, centroid norm={np.linalg.norm(centroids[pid]):.3f}")
+        print(
+            f"  Person {pid}: {(mask).sum()} windows, centroid norm={np.linalg.norm(centroids[pid]):.3f}"
+        )
 
     centroids_path = os.path.join(
         os.path.dirname(__file__), cfg.checkpoint_dir, f"centroids_{cfg.model_type}.pkl"

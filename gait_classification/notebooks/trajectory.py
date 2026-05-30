@@ -5,6 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 BASE = "Gait-Datasets-TIFS20/Dataset #1/train/Inertial Signals"
 
+
 def load(name):
     return pd.read_csv(f"{BASE}/{name}.txt", sep=r"\s+", header=None).to_numpy()
 
@@ -22,9 +23,7 @@ dt = 1.0 / fs
 gyro_in_degrees = True  # set False if gyro is already in rad/s
 subtract_gravity = False  # set False if accel is already body (gravity-removed)
 
-acc = np.stack(
-    [ax_[sample_index], ay_[sample_index], az_[sample_index]], axis=1
-)  # (N, 3)
+acc = np.stack([ax_[sample_index], ay_[sample_index], az_[sample_index]], axis=1)  # (N, 3)
 gyr = np.stack([gx_[sample_index], gy_[sample_index], gz_[sample_index]], axis=1)
 if gyro_in_degrees:
     gyr = np.deg2rad(gyr)
@@ -92,7 +91,5 @@ ax.set_zlabel("Z (m)")
 ax.set_title(f"Reconstructed 3D trajectory — sample {sample_index}")
 ax.legend()
 plt.tight_layout()
-plt.savefig(
-    f"src/gait_classification/figures/trajectory_3d_sample_{sample_index}.png", dpi=120
-)
+plt.savefig(f"src/gait_classification/figures/trajectory_3d_sample_{sample_index}.png", dpi=120)
 plt.show()

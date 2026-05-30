@@ -40,15 +40,11 @@ class LSTM(nn.Module):
     def forward(self, x):
         """Forward pass through the LSTM model."""
         # x shape: (batch_size, seq_length, input_size)
-        lstm_out, _ = self.lstm(
-            x
-        )  # lstm_out shape: (batch_size, seq_length, hidden_size)
+        lstm_out, _ = self.lstm(x)  # lstm_out shape: (batch_size, seq_length, hidden_size)
         # Take the last time step's output
         last_output = lstm_out[:, -1, :]  # last_output shape: (batch_size, hidden_size)
         last_output = self.dropout(last_output)
-        embedding = self.fc(
-            last_output
-        )  # embedding shape: (batch_size, embedding_size)
+        embedding = self.fc(last_output)  # embedding shape: (batch_size, embedding_size)
         embedding = F.normalize(embedding, p=2, dim=1)
         return embedding
 

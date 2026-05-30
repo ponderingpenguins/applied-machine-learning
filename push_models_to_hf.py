@@ -13,9 +13,7 @@ from gait_classification.hf_utils import upload_models
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Push trained models to Hugging Face Hub"
-    )
+    parser = argparse.ArgumentParser(description="Push trained models to Hugging Face Hub")
     parser.add_argument(
         "--checkpoints-dir",
         type=Path,

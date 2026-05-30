@@ -39,9 +39,7 @@ CHANNEL_FILES = {
 
 def load_signal(file_name):
     """Load a signal file into a NumPy array of shape (n_samples, n_timesteps)."""
-    return pd.read_csv(
-        f"{SIGNALS_DIR}/{file_name}.txt", sep=r"\s+", header=None
-    ).to_numpy()
+    return pd.read_csv(f"{SIGNALS_DIR}/{file_name}.txt", sep=r"\s+", header=None).to_numpy()
 
 
 def extract_fft_features(signals, n_samples):
@@ -149,25 +147,17 @@ def run_fold(fft_raw, y, known, unknown, fold_rng):
     fft[test_neg_idx] = scaler.transform(fft[test_neg_idx])
 
     # Centroids from train windows
-    centroids = np.array(
-        [fft[train_idx][y[train_idx] == pid].mean(axis=0) for pid in known]
-    )
+    centroids = np.array([fft[train_idx][y[train_idx] == pid].mean(axis=0) for pid in known])
 
     # Tune threshold on dev (the threshold is a distance to nearest centroid, so we want to find the point that best separates dev-pos from dev-neg, the EER point on the dev set)
     dev_idx = np.concatenate([dev_pos_idx, dev_neg_idx])
     dev_dist, _ = nearest_cluster_distance(fft[dev_idx], centroids)
-    threshold, _ = tune_threshold(
-        dev_dist[: len(dev_pos_idx)], dev_dist[len(dev_pos_idx) :]
-    )
+    threshold, _ = tune_threshold(dev_dist[: len(dev_pos_idx)], dev_dist[len(dev_pos_idx) :])
 
     # Evaluate on test
     test_idx = np.concatenate([test_pos_idx, test_neg_idx])
-    test_binary = np.concatenate(
-        [np.ones(len(test_pos_idx)), np.zeros(len(test_neg_idx))]
-    )
-    test_pids = np.concatenate(
-        [y[test_pos_idx], np.zeros(len(test_neg_idx), dtype=int)]
-    )
+    test_binary = np.concatenate([np.ones(len(test_pos_idx)), np.zeros(len(test_neg_idx))])
+    test_pids = np.concatenate([y[test_pos_idx], np.zeros(len(test_neg_idx), dtype=int)])
     test_dist, test_nearest = nearest_cluster_distance(fft[test_idx], centroids)
 
     thresholds, fars, frrs = compute_far_frr_curve(
@@ -248,9 +238,7 @@ def main():
     for k, test_fold in tqdm(enumerate(folds), total=N_FOLDS, desc="CV folds"):
         known = np.concatenate([folds[j] for j in range(N_FOLDS) if j != k])
         unknown = test_fold
-        print(
-            f"\n=== Fold {k + 1}/{N_FOLDS}  known={len(known)}  unknown={len(unknown)} ==="
-        )
+        print(f"\n=== Fold {k + 1}/{N_FOLDS}  known={len(known)}  unknown={len(unknown)} ===")
 
         fold_rng = np.random.default_rng(RANDOM_STATE + k)
         eer, mfar, mfrr, ts, fars, frrs = run_fold(fft_raw, y, known, unknown, fold_rng)

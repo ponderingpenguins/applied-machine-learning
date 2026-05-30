@@ -1,10 +1,8 @@
 """Utilities for uploading and downloading models from Hugging Face Hub."""
 
 import os
-import pickle
 from pathlib import Path
 
-import torch
 from huggingface_hub import HfApi, hf_hub_download, login, whoami
 
 from gait_classification.utils import ModelType
@@ -36,9 +34,7 @@ def authenticate_hf(token: str | None = None):
             login(token=token)
 
 
-def download_model_checkpoint(
-    model_type: ModelType, cache_dir: Path | None = None
-) -> Path:
+def download_model_checkpoint(model_type: ModelType, cache_dir: Path | None = None) -> Path:
     """Download model checkpoint from HF Hub.
 
     Args:

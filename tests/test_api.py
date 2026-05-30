@@ -3,7 +3,6 @@ from fastapi.testclient import TestClient
 from gait_classification.api import app, trusted_users
 from gait_classification.utils import ModelType
 
-
 client = TestClient(app)
 
 
@@ -31,6 +30,7 @@ def test_model_page_renders_selected_model_window():
     assert "#add-trusted-user" in response.text
     assert "/models/transformer/classify" in response.text
     assert "forward pass on our model" in response.text
+
 
 def test_model_action_pages_render():
     upload_response = client.post(

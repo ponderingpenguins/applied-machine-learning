@@ -3,11 +3,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class CosFaceHead(nn.Module):
     """
     A wrapper model that adds a CosFace-compatible linear layer (classifier)
     to a base embedding model.
     """
+
     def __init__(self, base_model: nn.Module, embedding_size: int, num_classes: int):
         super().__init__()
         self.base_model = base_model
@@ -32,7 +34,7 @@ class CosFaceHead(nn.Module):
 
         # 4. Calculate cosine similarities (logits)
         logits = F.linear(embeddings_norm, weights_norm)
-        
+
         return logits
 
     def get_embeddings(self, x: torch.Tensor) -> torch.Tensor:

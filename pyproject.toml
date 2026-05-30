@@ -56,3 +56,7 @@ packages = ["gait_classification"]
 line-length = 100
 target-version = ["py312"]
 
+[tool.flake8]
+max-line-length = 100
+extend-ignore = "E203"
+

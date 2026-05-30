@@ -1,4 +1,5 @@
 """Compute and save FFT-based centroids."""
+
 import os
 import pickle
 import sys
@@ -90,9 +91,7 @@ def main():
         print(f"  Person {pid}: {n_windows} windows, centroid norm={norm:.3f}")
 
     # Save FFT scaler
-    scaler_fft_path = os.path.join(
-        os.path.dirname(__file__), cfg.checkpoint_dir, "scaler_fft.pkl"
-    )
+    scaler_fft_path = os.path.join(os.path.dirname(__file__), cfg.checkpoint_dir, "scaler_fft.pkl")
     with open(scaler_fft_path, "wb") as f:
         pickle.dump(scaler, f)
     print(f"Saved FFT scaler to {scaler_fft_path}")

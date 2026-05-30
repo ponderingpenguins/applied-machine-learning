@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class CosFaceLoss(nn.Module):
     """CosFace loss for face recognition and similar tasks."""
 

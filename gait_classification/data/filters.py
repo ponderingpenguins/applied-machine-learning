@@ -68,9 +68,7 @@ class FFTFilter(Filter):
         # Compute the FFT of the data
         fft_data = np.fft.fft(data, axis=0)
         # Create an array of zeros for all features
-        full_fft_data = np.zeros(
-            (fft_data.shape[0], len(self.selected_features)), dtype=complex
-        )
+        full_fft_data = np.zeros((fft_data.shape[0], len(self.selected_features)), dtype=complex)
         # Fill in the selected features with the filtered FFT data
         full_fft_data[:, self.selected_features] = fft_data
         # Inverse FFT to get back to time domain
@@ -106,13 +104,10 @@ class KalmanFilter(Filter):
                 ] + self.process_variance * np.eye(n_features)
 
                 innovation = data[i] - predicted_state
-                innovation_covariance = (
-                    predicted_covariance
-                    + self.measurement_variance * np.eye(n_features)
+                innovation_covariance = predicted_covariance + self.measurement_variance * np.eye(
+                    n_features
                 )
-                kalman_gain = predicted_covariance @ np.linalg.inv(
-                    innovation_covariance
-                )
+                kalman_gain = predicted_covariance @ np.linalg.inv(innovation_covariance)
                 self.estimated_state[i] = predicted_state + kalman_gain @ innovation
                 self.estimated_covariance[i] = (
                     np.eye(n_features) - kalman_gain
@@ -151,9 +146,7 @@ class LowPassFFTFilter(FFTFilter):
     """Low-pass filter using FFT"""
 
     def __init__(self, cutoff_freq: float, fs: float):
-        super().__init__(
-            threshold=0.95
-        )  # Use the default threshold for feature selection
+        super().__init__(threshold=0.95)  # Use the default threshold for feature selection
         self.cutoff_freq = cutoff_freq
         self.fs = fs
 
@@ -181,9 +174,7 @@ class ButterworthLowPassFilter(Filter):
 
     def inverse(self, data):
         """The Butterworth filter is not invertible, so don't implement this method"""
-        raise NotImplementedError(
-            "ButterworthLowPassFilter does not implement the inverse method"
-        )
+        raise NotImplementedError("ButterworthLowPassFilter does not implement the inverse method")
 
 
 def construct_filters(cfg: TrainConfig) -> list[Filter]:
@@ -198,14 +189,10 @@ def construct_filters(cfg: TrainConfig) -> list[Filter]:
             )
             filters.append(butterworth_filter)
         elif filter_name == "kalman":
-            kalman_filter = KalmanFilter(
-                process_variance=1e-5, measurement_variance=1e-2
-            )
+            kalman_filter = KalmanFilter(process_variance=1e-5, measurement_variance=1e-2)
             filters.append(kalman_filter)
         elif filter_name == "fft_lowpass":
-            fft_filter = LowPassFFTFilter(
-                cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate
-            )
+            fft_filter = LowPassFFTFilter(cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate)
             filters.append(fft_filter)
 
     return filters

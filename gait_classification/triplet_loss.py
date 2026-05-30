@@ -27,7 +27,6 @@ def mine_semihard_triplets(
             continue
 
         pos_list = pos_indices.tolist()
-        neg_list = neg_indices.tolist()
 
         for a_idx in pos_list:
             for p_idx in pos_list:

@@ -28,7 +28,9 @@ def _load_cv_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
             "train_mean": np.asarray(history["train_loss_mean"], dtype=float),
             "val_mean": np.asarray(history[metric_key], dtype=float),
             "train_std": np.asarray(history.get("train_loss_std", []), dtype=float),
-            "val_std": np.asarray(history.get(metric_sem_key, history.get(metric_std_key, [])), dtype=float),
+            "val_std": np.asarray(
+                history.get(metric_sem_key, history.get(metric_std_key, [])), dtype=float
+            ),
             "metric_label": metric_label,
         }
 
@@ -75,9 +77,7 @@ def _load_final_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
     }
 
 
-def plot_training_curves(
-    checkpoint_dir: str = "checkpoints", output_path: str = None
-) -> None:
+def plot_training_curves(checkpoint_dir: str = "checkpoints", output_path: str = None) -> None:
     """Plot cross-validation mean curves and the final full-training curves.
 
     Args:
@@ -100,7 +100,11 @@ def plot_training_curves(
         epochs = np.arange(1, len(train_mean) + 1)
     else:
         train_mean = final_history["train_loss"]
-        val_mean = final_history["val_eer"] if len(final_history["val_eer"]) > 0 else final_history["val_loss"]
+        val_mean = (
+            final_history["val_eer"]
+            if len(final_history["val_eer"]) > 0
+            else final_history["val_loss"]
+        )
         train_std = np.array([])
         val_std = np.array([])
         metric_label = "EER" if len(final_history["val_eer"]) > 0 else "Loss"
@@ -126,7 +130,11 @@ def plot_training_curves(
         markersize=4,
     )
 
-    if final_history is not None and len(final_history["train_loss"]) > 0 and cv_history is not None:
+    if (
+        final_history is not None
+        and len(final_history["train_loss"]) > 0
+        and cv_history is not None
+    ):
         final_epochs = np.arange(1, len(final_history["train_loss"]) + 1)
         plt.plot(
             final_epochs,
@@ -141,7 +149,11 @@ def plot_training_curves(
         final_epochs = np.arange(1, len(final_history["val_loss"]) + 1)
         plt.plot(
             final_epochs,
-            final_history["val_eer"] if len(final_history["val_eer"]) > 0 else final_history["val_loss"],
+            (
+                final_history["val_eer"]
+                if len(final_history["val_eer"]) > 0
+                else final_history["val_loss"]
+            ),
             color="darkred",
             linestyle="--",
             label=f"Val {metric_label} (final)",

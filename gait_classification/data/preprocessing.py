@@ -15,9 +15,7 @@ if __name__ == "__main__":
     cfg = OmegaConf.structured(TrainConfig)
 
     lowpass_filter = LowPassFFTFilter(cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate)
-    basic_fft_filter = LowPassFFTFilter(
-        cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate
-    )
+    basic_fft_filter = LowPassFFTFilter(cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate)
     butter_filter = ButterworthLowPassFilter(
         cutoff_freq=cfg.cutoff_freq, fs=cfg.sampling_rate, order=cfg.filter_order
     )
@@ -52,9 +50,7 @@ if __name__ == "__main__":
         ax.set_ylabel("x(t)", fontsize=9)
         ax.set_title(f"Sample {sample_idx} (Class: {y[sample_idx]})", fontsize=10)
 
-    plt.suptitle(
-        "Comparison of Filters on Multiple Samples", fontsize=12, fontweight="bold"
-    )
+    plt.suptitle("Comparison of Filters on Multiple Samples", fontsize=12, fontweight="bold")
     plt.tight_layout()
     output_path = cfg.figures_dir + "preprocessing_demo.png"
     plt.savefig(output_path, dpi=120, bbox_inches="tight")

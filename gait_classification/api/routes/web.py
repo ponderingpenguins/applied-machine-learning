@@ -1,12 +1,10 @@
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from gait_classification.api.routes.ml import SensorSample, GaitData
-from gait_classification.api.state import get_model_and_scaler
 from gait_classification.utils import ModelType
 
 router = APIRouter()
@@ -85,5 +83,3 @@ async def model_page(request: Request, model_type: ModelType):
             "selected_label": _LABELS.get(model_type.value, model_type.value),
         },
     )
-
-
