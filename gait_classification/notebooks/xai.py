@@ -46,9 +46,7 @@ CHANNELS = list(CHANNEL_FILES.keys())
 
 
 def load_signal(file_name):
-    return pd.read_csv(
-        f"{SIGNALS_DIR}/{file_name}.txt", sep=r"\s+", header=None
-    ).to_numpy()
+    return pd.read_csv(f"{SIGNALS_DIR}/{file_name}.txt", sep=r"\s+", header=None).to_numpy()
 
 
 def extract_fft_features(signals, n_samples):

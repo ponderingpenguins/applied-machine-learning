@@ -1,0 +1,37 @@
+\section{What Is Implemented}
+
+The project, as discussed with the TA, is in a deployed state. The repository is public and can be opened directly at \url{https://github.com/ponderingpenguins/applied-machine-learning}. It is hosted live at \url{https://gait-authentication.sigurdurhaukur.com} with a FastAPI backend and an interactive web interface. The API documentation is available at \url{https://gait-authentication.sigurdurhaukur.com/docs}. We reccomend trying the live deployment to see the full functionality using any smartphone with a gyroscope and accelerometer (most modern smartphones have these sensors). The web interface allows you to select a model, record your gait data in real time, and see the authentication results with visual feedback.
+
+In the current state, it is a deep learning-based gait authentication system using IMU sensor data. The current implementation includes a training pipeline, a deployed FastAPI API, and a web interface for inspecting and using the models. The root \texttt{README.md} documents how to install dependencies and launch the API locally with \texttt{uvicorn} or Docker Compose.
+
+\subsection*{Core ML Pipeline}
+\begin{itemize}
+    \item Dual model architectures (LSTM and Transformer) for gait classification, with embedding-based inference.
+    \item K-fold cross-validation training pipeline with configurable preprocessing (Butterworth, Kalman, FFT filters).
+    \item Centroid-based classification with embedding extraction.
+    \item Automatic model storage and retrieval via Hugging Face Hub.
+\end{itemize}
+
+\subsection*{Web API \& Deployment}
+\begin{itemize}
+    \item FastAPI backend serving inference endpoints (\texttt{\detokenize{/models/{model_type}/encode-recording}} and \texttt{\detokenize{/models/{model_type}/authenticate}}).
+    \item Interactive web UI with model selection, real-time sensor input, and result visualization.
+    \item Recent improvements: better UI/homepage, micro-interactions, green/red result screens, timer with audio feedback.
+    \item Docker Compose deployment configuration.
+\end{itemize}
+
+\subsection*{Data Pipeline}
+\begin{itemize}
+    \item Signal preprocessing with sliding window segmentation.
+    \item StandardScaler normalization (participant-aware).
+    \item FFT-based feature selection.
+    \item Support for raw IMU data (accel x/y/z, gyro x/y/z).
+\end{itemize}
+
+\subsection*{Development \& Quality}
+\begin{itemize}
+    \item Pre-commit hooks with \texttt{flake8} linting.
+    \item Code formatted with \texttt{black}.
+    \item Dependency management via \texttt{uv} package manager.
+    \item Multiple utility scripts (training curves plotting, centroid computation, HF model management).
+\end{itemize}

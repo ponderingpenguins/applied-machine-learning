@@ -4,8 +4,8 @@
 def main():
     """Main function for gait classification."""
     print("Gait Classification Pipeline")
-    return None
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

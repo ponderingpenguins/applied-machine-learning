@@ -1,0 +1,42 @@
+----
+hash: 6e4e38c
+date: 2026-05-07
+author: eZbal
+subject: set up cutoff and butterworth low-pass filters
+body: Co-authored-by: Copilot <copilot@github.com>
+
+----
+hash: c5edb3e
+date: 2026-05-01
+author: Peter Meeus
+subject: Updated Sections 1-5: Added all the nessisary references to open-set verification and triplet loss
+body: Co-authored-by: Copilot <copilot@github.com>
+
+----
+hash: 1a87b66
+date: 2026-05-01
+author: Peter Meeus
+subject: Updated Sections 4-5: Turned them into paragraphs with the updated evaluation metrics and motivations.
+body: Co-authored-by: Copilot <copilot@github.com>
+
+----
+hash: e3dbae3
+date: 2026-04-30
+author: Peter Meeus
+subject: Updated Section 3 - forgot that we are using the segmented dataset. Fixed some non working references in python files
+body: Co-authored-by: Copilot <copilot@github.com>
+
+----
+hash: 3f6da29
+date: 2026-04-30
+author: Peter Meeus
+subject: Updated Section 3 - Proper Paragraphs and Clean Decisions
+body: Co-authored-by: Copilot <copilot@github.com>
+
+----
+hash: f03046b
+date: 2026-04-30
+author: eZbal
+subject: Merge branch 'dev/haukur' of https://github.com/ponderingpenguins/applied-machine-learning into dev/efe
+body: Co-authored-by: Copilot <copilot@github.com>
+

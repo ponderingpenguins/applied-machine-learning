@@ -12,6 +12,14 @@ venv/
 Gait-Datasets-TIFS20
 *.zip
 
+# Torch model checkpoints
+checkpoints/
+*.pth
+*.pt
+
+# Pickles
+*.pkl
+
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof

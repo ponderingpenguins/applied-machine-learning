@@ -7,8 +7,8 @@ name = "applied-machine-learning"
 version = "0.1.0"
 description = "Gait Classification Assignment Applied ML"
 authors = [
-	{ name = "Haukur Sigurdur", email = "efeozbal01@gmail.com"},
-	{ name = "Efe Ozbal" },
+	{ name = "Haukur Sigurdur"},
+	{ name = "Efe Ozbal", email = "efeozbal01@gmail.com"},
 	{ name = "Will Meeus", email = "will.meeus@gmail.com" },
 	{ name = "Tijje Steeman", email = "tijjesteeman@gmail.com" },
 ]
@@ -22,12 +22,26 @@ dependencies = [
 	"matplotlib>=3.9.2",
 	"seaborn>=0.13.2",
 	"tqdm>=4.67.3",
+	"torch>=2.11.0",
+	"torchinfo>=1.8.0",
+	"omegaconf>=2.3.0",
+	"fastapi>=0.136.1",
+	"uvicorn>=0.47.0",
+	"huggingface-hub>=0.21.0",
+	"python-multipart>=0.0.9",
+	"jinja2>=3.1.0",
 ]
 
 [project.scripts]
 gait_classification = "gait_classification.main:main"
 
 [dependency-groups]
+server = [
+	"fastapi>=0.115.0",
+	"jinja2>=3.1.0",
+	"python-multipart>=0.0.9",
+	"uvicorn>=0.30.0",
+]
 dev = [
 	"black>=24.8.0",
 	"flake8>=6.1.0",
@@ -41,4 +55,8 @@ packages = ["gait_classification"]
 [tool.black]
 line-length = 100
 target-version = ["py312"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = "E203"
 
