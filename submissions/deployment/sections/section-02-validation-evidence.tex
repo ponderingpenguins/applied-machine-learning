@@ -1,3 +1,19 @@
 \section{Validation Evidence}
 
-The Transformer model reaches a validation equal error rate (EER) of 7.68\%. For a random baseline, the EER level would be 50\%, which is randomly choosing to accept or reject a given embedding. Here we see that the model is clearly better than random guessing on the validation data. Its important to note that because this task is verification rather than plain multiclass classification, EER is the relevant metric to report, such that lower is better. $(7.68\% \ll 50\%)$
+We evaluate all three methods using equal error rate (EER), the standard metric for biometric verification. A random baseline achieves 50\% EER (accept or reject with equal error). Lower is better.
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{lr}
+    \toprule
+    Method & EER \\
+    \midrule
+    Transformer & 7.68\% \\
+    LSTM & 16.90\% \\
+    FFT + Centroid & 49.54\% \\
+    \bottomrule
+  \end{tabular}
+  \caption{Equal error rates across three gait classification methods.}
+\end{table}
+
+The Transformer model substantially outperforms both baselines. The LSTM achieves moderate improvement over the hand-crafted FFT features, which perform near chance level. This progression reflects the ability of learned embeddings to capture discriminative gait patterns that simple frequency-domain features do not.
