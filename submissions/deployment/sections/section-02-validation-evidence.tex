@@ -1,6 +1,6 @@
 \section{Validation Evidence}
 
-We evaluate all three methods using equal error rate (EER), the standard metric for biometric verification. A random baseline achieves 50\% EER (accept or reject with equal error). Lower is better.
+We evaluate all three methods on a held-out test set of 18 participants (15\% of the dataset) comprising 5,454 gait windows. Test participants have between 117 and 639 windows each (mean 303, std 127), reflecting natural variation in data availability across subjects. We use equal error rate (EER) as the evaluation metric. EER reports the error rate at the threshold where false acceptance rate and false rejection rate are equal, and is standard for biometric verification systems. A random baseline achieves 50\% EER. Lower is better.
 
 \begin{table}[h]
   \centering
@@ -16,4 +16,6 @@ We evaluate all three methods using equal error rate (EER), the standard metric 
   \caption{Equal error rates across three gait classification methods.}
 \end{table}
 
-The Transformer model substantially outperforms both baselines. The LSTM achieves moderate improvement over the hand-crafted FFT features, which perform near chance level. This progression reflects the ability of learned embeddings to capture discriminative gait patterns that simple frequency-domain features do not.
+The Transformer model substantially outperforms both baselines. The LSTM achieves moderate improvement over hand-crafted FFT features, which perform near chance level. This progression reflects the ability of learned embeddings to capture discriminative gait patterns that frequency-domain features do not.
+
+An EER of 7.68\% translates to approximately 8 errors per 100 authentication requests. In practice, the decision threshold can be adjusted based on application requirements. Raising the threshold reduces false acceptances (impostors) at the cost of increasing false rejections (legitimate users), and vice versa. For this project, we maintained the balanced threshold where false positive and false negative rates are equal.

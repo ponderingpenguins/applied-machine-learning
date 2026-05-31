@@ -51,14 +51,31 @@ def get_model_and_scaler(model_type: ModelType):
             raise FileNotFoundError(f"Model not found at {checkpoint_path} and HF download failed")
 
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    dim_feedforward = checkpoint.get("transformer_dim_feedforward") or checkpoint.get(
-        "dim_feedforward"
-    )
-    config = TrainConfig(
-        model_type=checkpoint["model_type"],
-        embedding_size=checkpoint["embedding_size"],
-        **({"transformer_dim_feedforward": dim_feedforward} if dim_feedforward else {}),
-    )
+    
+    # Extract transformer config from checkpoint (handle old and new key names)
+    config_kwargs = {
+        "model_type": checkpoint["model_type"],
+        "embedding_size": checkpoint["embedding_size"],
+    }
+    
+    # Handle transformer-specific config
+    if checkpoint.get("model_type") == "transformer":
+        # Prefer new key names, fall back to old ones
+        d_model = checkpoint.get("transformer_d_model") or checkpoint.get("d_model")
+        nhead = checkpoint.get("transformer_nhead") or checkpoint.get("nhead")
+        num_layers = checkpoint.get("transformer_num_layers") or checkpoint.get("num_layers")
+        dim_feedforward = checkpoint.get("transformer_dim_feedforward") or checkpoint.get("dim_feedforward")
+        
+        if d_model:
+            config_kwargs["transformer_d_model"] = d_model
+        if nhead:
+            config_kwargs["transformer_nhead"] = nhead
+        if num_layers:
+            config_kwargs["transformer_num_layers"] = num_layers
+        if dim_feedforward:
+            config_kwargs["transformer_dim_feedforward"] = dim_feedforward
+    
+    config = TrainConfig(**config_kwargs)
     model = construct_model(config, torch.device("cpu"))
     state_dict = checkpoint["model_state_dict"]
     # Strip wrapper prefix if checkpoint was saved from a wrapped model
