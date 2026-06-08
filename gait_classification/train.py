@@ -153,6 +153,16 @@ def summarize_fold_histories(fold_histories: list[dict[str, list[float]]]) -> di
         for history in fold_histories
         if "val_eer" in history and len(history["val_eer"]) > 0
     ]
+    val_far_curves = [
+        np.asarray(history["val_far"], dtype=float)
+        for history in fold_histories
+        if "val_far" in history and len(history["val_far"]) > 0
+    ]
+    val_frr_curves = [
+        np.asarray(history["val_frr"], dtype=float)
+        for history in fold_histories
+        if "val_frr" in history and len(history["val_frr"]) > 0
+    ]
 
     summary: dict[str, object] = {
         "n_folds": len(fold_histories),
@@ -161,6 +171,10 @@ def summarize_fold_histories(fold_histories: list[dict[str, list[float]]]) -> di
 
     if val_eer_curves:
         summary.update(_mean_std_sem(val_eer_curves, "val_eer"))
+    if val_far_curves:
+        summary.update(_mean_std_sem(val_far_curves, "val_far"))
+    if val_frr_curves:
+        summary.update(_mean_std_sem(val_frr_curves, "val_frr"))
 
     best_val_eers = [
         float(history["best_val_eer"])
@@ -294,7 +308,7 @@ def train_on_split(
 
             if val_eer + early_stopping_min_delta < best_val_eer:
                 best_val_eer = val_eer
-                best_epoch = epoch + 1
+                best_epoch = epoch
                 best_state_dict = copy.deepcopy(model.state_dict())
                 epochs_without_improvement = 0
             else:

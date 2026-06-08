@@ -1,213 +1,184 @@
-"""
-Plot training curves from saved training history.
+"""Plot cross-validation diagnostics for overfitting.
 
 Usage:
-python plot_training_curves.py --checkpoint-dir checkpoints --output figures/training_curves.png
+python -m gait_classification.plot_training_curves \
+    --checkpoint-dir checkpoints \
+    --output figures/overfitting_diagnostics.png
 """
 
+import argparse
 import json
 import os
 from glob import glob
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Patch
 
 
-def _load_cv_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
-    cv_summary_path = os.path.join(checkpoint_dir, "training_history_cv_mean.json")
+def _load_fold_histories(checkpoint_dir: str) -> list[dict[str, list[float]]]:
     fold_paths = sorted(glob(os.path.join(checkpoint_dir, "training_history_fold*.json")))
+    if not fold_paths:
+        raise FileNotFoundError(
+            f"No training_history_fold*.json files found in {checkpoint_dir}"
+        )
 
-    if os.path.exists(cv_summary_path):
-        with open(cv_summary_path, "r") as f:
-            history = json.load(f)
-        metric_key = "val_eer_mean" if "val_eer_mean" in history else "val_loss_mean"
-        metric_sem_key = "val_eer_sem" if "val_eer_sem" in history else "val_loss_sem"
-        metric_std_key = "val_eer_std" if "val_eer_std" in history else "val_loss_std"
-        metric_label = "EER" if metric_key == "val_eer_mean" else "Loss"
-        return {
-            "train_mean": np.asarray(history["train_loss_mean"], dtype=float),
-            "val_mean": np.asarray(history[metric_key], dtype=float),
-            "train_std": np.asarray(history.get("train_loss_std", []), dtype=float),
-            "val_std": np.asarray(
-                history.get(metric_sem_key, history.get(metric_std_key, [])), dtype=float
-            ),
-            "metric_label": metric_label,
-        }
-
-    if fold_paths:
-        histories = []
-        for fold_path in fold_paths:
-            with open(fold_path, "r") as f:
-                histories.append(json.load(f))
-
-        train_curves = [np.asarray(history["train_loss"], dtype=float) for history in histories]
-        if all("val_eer" in history for history in histories):
-            val_curves = [np.asarray(history["val_eer"], dtype=float) for history in histories]
-            metric_label = "EER"
-        else:
-            val_curves = [np.asarray(history["val_loss"], dtype=float) for history in histories]
-            metric_label = "Loss"
-        min_train_len = min(len(curve) for curve in train_curves)
-        min_val_len = min(len(curve) for curve in val_curves)
-        train_stack = np.stack([curve[:min_train_len] for curve in train_curves], axis=0)
-        val_stack = np.stack([curve[:min_val_len] for curve in val_curves], axis=0)
-        return {
-            "train_mean": train_stack.mean(axis=0),
-            "val_mean": val_stack.mean(axis=0),
-            "train_std": train_stack.std(axis=0),
-            "val_std": val_stack.std(axis=0),
-            "metric_label": metric_label,
-        }
-
-    return None
+    histories = []
+    for fold_path in fold_paths:
+        with open(fold_path, "r", encoding="utf-8") as file:
+            histories.append(json.load(file))
+    return histories
 
 
-def _load_final_history(checkpoint_dir: str) -> dict[str, np.ndarray] | None:
-    history_path = os.path.join(checkpoint_dir, "training_history.json")
-    if not os.path.exists(history_path):
-        return None
+def _mean_and_sem(
+    histories: list[dict[str, list[float]]],
+    metric: str,
+    n_epochs: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    mean = np.empty(n_epochs, dtype=float)
+    sem = np.empty(n_epochs, dtype=float)
+    counts = np.empty(n_epochs, dtype=int)
 
-    with open(history_path, "r") as f:
-        history = json.load(f)
+    for epoch_index in range(n_epochs):
+        values = np.asarray(
+            [
+                history[metric][epoch_index]
+                for history in histories
+                if len(history[metric]) > epoch_index
+            ],
+            dtype=float,
+        )
+        counts[epoch_index] = len(values)
+        mean[epoch_index] = values.mean()
+        sem[epoch_index] = (
+            values.std(ddof=1) / np.sqrt(len(values)) if len(values) > 1 else np.nan
+        )
+    return mean, sem, counts
 
-    return {
-        "train_loss": np.asarray(history.get("train_loss", []), dtype=float),
-        "val_loss": np.asarray(history.get("val_loss", []), dtype=float),
-        "val_eer": np.asarray(history.get("val_eer", []), dtype=float),
+
+def plot_training_curves(
+    checkpoint_dir: str = "checkpoints",
+    output_path: str | None = None,
+) -> None:
+    """Plot mean training loss and validation verification errors across folds.
+
+    Later epochs include the folds that were still training, and the number of
+    contributing folds is shown below the x-axis. Shaded regions show mean +/-
+    one standard error across the contributing folds.
+
+    The independent holdout set is deliberately not plotted because it should
+    not be used for epoch selection.
+    """
+    histories = _load_fold_histories(checkpoint_dir)
+    required_metrics = ("train_loss", "val_eer", "val_far", "val_frr")
+    for metric in required_metrics:
+        if not all(metric in history and history[metric] for history in histories):
+            raise ValueError(f"Fold histories do not all contain non-empty {metric!r}")
+
+    n_epochs = max(
+        len(history[metric])
+        for history in histories
+        for metric in required_metrics
+    )
+    epochs = np.arange(1, n_epochs + 1)
+    train_mean, train_sem, train_counts = _mean_and_sem(histories, "train_loss", n_epochs)
+    verification_metrics = {
+        "EER": _mean_and_sem(histories, "val_eer", n_epochs),
+        "FAR": _mean_and_sem(histories, "val_far", n_epochs),
+        "FRR": _mean_and_sem(histories, "val_frr", n_epochs),
     }
 
+    figure, (loss_axis, error_axis) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
-def plot_training_curves(checkpoint_dir: str = "checkpoints", output_path: str = None) -> None:
-    """Plot cross-validation mean curves and the final full-training curves.
-
-    Args:
-        checkpoint_dir: Directory containing training history files.
-        output_path: Optional path to save the plot. If None, displays the plot.
-    """
-    cv_history = _load_cv_history(checkpoint_dir)
-    final_history = _load_final_history(checkpoint_dir)
-
-    if cv_history is None and final_history is None:
-        raise FileNotFoundError(f"No training history found in {checkpoint_dir}")
-
-    epochs = None
-    if cv_history is not None:
-        train_mean = cv_history["train_mean"]
-        val_mean = cv_history["val_mean"]
-        train_std = cv_history["train_std"]
-        val_std = cv_history["val_std"]
-        metric_label = cv_history.get("metric_label", "Loss")
-        epochs = np.arange(1, len(train_mean) + 1)
-    else:
-        train_mean = final_history["train_loss"]
-        val_mean = (
-            final_history["val_eer"]
-            if len(final_history["val_eer"]) > 0
-            else final_history["val_loss"]
-        )
-        train_std = np.array([])
-        val_std = np.array([])
-        metric_label = "EER" if len(final_history["val_eer"]) > 0 else "Loss"
-        epochs = np.arange(1, len(train_mean) + 1)
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(
+    loss_axis.plot(
         epochs,
         train_mean,
-        "b-",
-        label="Train Loss (mean)",
-        linewidth=2,
+        color="tab:blue",
         marker="o",
-        markersize=4,
-    )
-    plt.plot(
-        epochs,
-        val_mean,
-        "r-",
-        label=f"Val {metric_label} (mean)",
         linewidth=2,
-        marker="s",
-        markersize=4,
+        label="Mean training loss",
+    )
+    loss_axis.fill_between(
+        epochs,
+        train_mean - train_sem,
+        train_mean + train_sem,
+        color="tab:blue",
+        alpha=0.18,
+    )
+    loss_axis.set_ylabel("CosFace training loss")
+    loss_axis.set_title("Optimization on Training Participants")
+    loss_axis.grid(alpha=0.3)
+    loss_axis.legend()
+
+    colors = {"EER": "tab:red", "FAR": "tab:orange", "FRR": "tab:green"}
+    for metric, (mean, sem, _) in verification_metrics.items():
+        mean_percent = mean * 100
+        sem_percent = sem * 100
+        error_axis.plot(
+            epochs,
+            mean_percent,
+            color=colors[metric],
+            marker="o",
+            linewidth=2,
+            label=f"Validation {metric}",
+        )
+        error_axis.fill_between(
+            epochs,
+            mean_percent - sem_percent,
+            mean_percent + sem_percent,
+            color=colors[metric],
+            alpha=0.12,
+        )
+
+    error_axis.legend(
+        handles=[
+            *error_axis.get_lines(),
+            Patch(
+                facecolor="gray",
+                alpha=0.18,
+                label="Shaded area: mean +/- SEM across active folds",
+            ),
+        ],
+        ncol=2,
+    )
+    error_axis.set_xlabel("Epoch")
+    error_axis.set_ylabel("Validation error rate (%)")
+    error_axis.set_title("Generalization to Unseen Validation Participants")
+    error_axis.grid(alpha=0.3)
+    error_axis.set_xticks(epochs)
+    error_axis.set_xticklabels(
+        [f"{epoch}\n(n={count})" for epoch, count in zip(epochs, train_counts)]
     )
 
-    if (
-        final_history is not None
-        and len(final_history["train_loss"]) > 0
-        and cv_history is not None
-    ):
-        final_epochs = np.arange(1, len(final_history["train_loss"]) + 1)
-        plt.plot(
-            final_epochs,
-            final_history["train_loss"],
-            color="navy",
-            linestyle="--",
-            label="Train Loss (final)",
-            linewidth=1.8,
-            alpha=0.9,
-        )
-    if final_history is not None and len(final_history["val_loss"]) > 0 and cv_history is not None:
-        final_epochs = np.arange(1, len(final_history["val_loss"]) + 1)
-        plt.plot(
-            final_epochs,
-            (
-                final_history["val_eer"]
-                if len(final_history["val_eer"]) > 0
-                else final_history["val_loss"]
-            ),
-            color="darkred",
-            linestyle="--",
-            label=f"Val {metric_label} (final)",
-            linewidth=1.8,
-            alpha=0.9,
-        )
-
-    if train_std.size == len(train_mean):
-        plt.fill_between(
-            epochs,
-            train_mean - train_std,
-            train_mean + train_std,
-            color="blue",
-            alpha=0.12,
-            linewidth=0,
-        )
-    if val_std.size == len(val_mean):
-        plt.fill_between(
-            epochs,
-            val_mean - val_std,
-            val_mean + val_std,
-            color="red",
-            alpha=0.12,
-            linewidth=0,
-        )
-
-    plt.xlabel("Epoch", fontsize=12)
-    plt.ylabel(metric_label, fontsize=12)
-    plt.title("Cross-Validation Mean and Final Training Curves", fontsize=14, fontweight="bold")
-    plt.legend(fontsize=11)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    figure.suptitle(
+        f"Overfitting Diagnostics ({len(histories)}-Fold Participant-Level CV)",
+        fontsize=15,
+        fontweight="bold",
+    )
+    figure.text(
+        0.5,
+        0.01,
+        (
+            "Lines are means over folds still active at each epoch; "
+            "n below each epoch is the number of contributing folds."
+        ),
+        ha="center",
+        fontsize=9,
+    )
+    figure.tight_layout(rect=(0, 0.035, 1, 0.96))
 
     if output_path:
-        plt.savefig(output_path, dpi=300)
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        figure.savefig(output_path, dpi=300)
         print(f"Plot saved to {output_path}")
     else:
         plt.show()
+    plt.close(figure)
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Plot training curves")
-    parser.add_argument(
-        "--checkpoint-dir",
-        default="checkpoints",
-        help="Directory containing training history files.",
-    )
-    parser.add_argument(
-        "--output",
-        default=None,
-        help="Path to save the plot (e.g., training_curves.png). If not provided, displays the plot.",
-    )
-
+    parser = argparse.ArgumentParser(description="Plot cross-validation diagnostics")
+    parser.add_argument("--checkpoint-dir", default="checkpoints")
+    parser.add_argument("--output")
     args = parser.parse_args()
     plot_training_curves(args.checkpoint_dir, args.output)

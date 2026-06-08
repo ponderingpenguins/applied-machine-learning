@@ -104,6 +104,44 @@ Finetuning uses the same configuration keys as training, plus the search is cent
 - LSTM search: `lstm_hidden_size`, `lstm_num_layers`
 - Transformer search: `transformer_d_model`, `transformer_nhead`, `transformer_num_layers`, `transformer_dim_feedforward`
 
+## Evaluation
+
+Evaluate the saved Transformer, LSTM, FFT + centroid baseline, and IID-random control on the same participant-disjoint holdout:
+
+```bash
+uv run python -m gait_classification.benchmark_models
+```
+
+By default it loads the following which needs to be setup manually. Results are written by default to `benchmark_results/benchmark_scores.json`.:
+
+- `checkpoints/final_model_transformer.pt`
+- `checkpoints/best_model_lstm.pt`
+
+Checkpoint and output paths can both be overridden if you need/want:
+
+```bash
+uv run python -m gait_classification.benchmark_models \
+  --transformer-checkpoint checkpoints/final_model_transformer.pt \
+  --lstm-checkpoint checkpoints/best_model_lstm.pt \
+  --output benchmark_results/benchmark_scores.json \
+  --n-bootstrap 2000
+```
+
+
+To add participant/window bootstrap 95% confidence intervals:
+
+```bash
+uv run python -m gait_classification.benchmark_models --n-bootstrap 2000
+```
+
+Plot cross-validation training loss and validation EER/FAR/FRR from saved fold histories:
+
+```bash
+uv run python -m gait_classification.plot_training_curves \
+  --checkpoint-dir checkpoints/transformer_history_unseeded \
+  --output benchmark_results/overfitting_diagnostics.png
+```
+
 ## Hugging Face
 
 Integration with Hugging Face Hub allows us to store and load trained models easily. The API automatically downloads models from HF on startup, and you can push your own models after training.
@@ -136,7 +174,7 @@ Open `http://localhost:8050` in a browser.
 
 ### Usage
 
-1. **Select a model** — choose LSTM or Transformer on the home page.
+1. **Select a model** — choose Transformer, LSTM, or FFT + Centroid.
 2. **Enroll a trusted user** — go to the model page and click **Start Recording**. Walk naturally for 60 seconds with your phone in your pocket. The gait is encoded and stored.
 3. **Classify a user** — go to the classify page, click **Start Recording**, and walk for a few seconds. The app compares the embedding against enrolled users and returns the closest match with a confidence score.
 

@@ -1,0 +1,212 @@
+{
+  "description": "Saved-checkpoint holdout benchmark. No training is performed. Transformer, LSTM, FFT, and IID random controls use the same participant-disjoint holdout and enrollment/probe evaluator.",
+  "device": "cpu",
+  "config": {
+    "figures_dir": "./figures/",
+    "batch_size": 128,
+    "num_epochs": 30,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "dropout": 0.0,
+    "early_stopping_patience": 5,
+    "early_stopping_min_delta": 0.0,
+    "evaluation_resamples": 10,
+    "model_type": "transformer",
+    "loss_type": "cosface",
+    "seed": 67,
+    "fft_threshold": 0.95,
+    "n_folds": 5,
+    "preprocess_filters": [
+      "none"
+    ],
+    "seq_len": 128,
+    "window_stride": 128,
+    "embedding_size": 32,
+    "triplet_margin": 0.3,
+    "cosface_margin": 0.35,
+    "cosface_scale": 30.0,
+    "lstm_hidden_size": 128,
+    "lstm_num_layers": 2,
+    "transformer_d_model": 32,
+    "transformer_nhead": 2,
+    "transformer_num_layers": 2,
+    "transformer_dim_feedforward": 256,
+    "train_split": 0.7,
+    "val_split": 0.15,
+    "max_samples": 0,
+    "checkpoint_dir": "checkpoints",
+    "push_to_hf": false,
+    "data_dir": "./Gait-Datasets-TIFS20/Dataset #1",
+    "train_dir": "./Gait-Datasets-TIFS20/Dataset #1/train",
+    "test_dir": "./Gait-Datasets-TIFS20/Dataset #1/test",
+    "signals_dir": "./Gait-Datasets-TIFS20/Dataset #1/train/Inertial Signals",
+    "y_path": "./Gait-Datasets-TIFS20/Dataset #1/train/y_train.txt",
+    "CHANNEL_FILES": {
+      "ACCx": "train_acc_x",
+      "ACCy": "train_acc_y",
+      "ACCz": "train_acc_z",
+      "GYRx": "train_gyr_x",
+      "GYRy": "train_gyr_y",
+      "GYRz": "train_gyr_z"
+    },
+    "sampling_rate": 50.0,
+    "cutoff_freq": 5.0,
+    "filter_order": 4
+  },
+  "test_participants": [
+    21,
+    74,
+    5,
+    16,
+    28,
+    10,
+    66,
+    49,
+    47,
+    31,
+    42,
+    44,
+    52,
+    53,
+    81,
+    85,
+    18,
+    41
+  ],
+  "test_windows": 5454,
+  "results": [
+    {
+      "name": "Transformer",
+      "eer": 0.04015500729487096,
+      "far": 0.039644312708410526,
+      "frr": 0.0406657018813314,
+      "eer_percent": 4.015500729487096,
+      "far_percent": 3.9644312708410525,
+      "frr_percent": 4.066570188133141,
+      "bootstrap_ci95": {
+        "eer": {
+          "mean": 0.031620801167276405,
+          "ci95_lower": 0.005555731007027065,
+          "ci95_upper": 0.0727138626745696,
+          "mean_percent": 3.1620801167276404,
+          "ci95_lower_percent": 0.5555731007027065,
+          "ci95_upper_percent": 7.27138626745696
+        },
+        "far": {
+          "mean": 0.0315637335151682,
+          "ci95_lower": 0.0055762592644504946,
+          "ci95_upper": 0.07325640494606808,
+          "mean_percent": 3.1563733515168204,
+          "ci95_lower_percent": 0.5576259264450495,
+          "ci95_upper_percent": 7.325640494606808
+        },
+        "frr": {
+          "mean": 0.03167786881938461,
+          "ci95_lower": 0.005678372865872867,
+          "ci95_upper": 0.07358392632351908,
+          "mean_percent": 3.1677868819384605,
+          "ci95_lower_percent": 0.5678372865872866,
+          "ci95_upper_percent": 7.358392632351908
+        }
+      }
+    },
+    {
+      "name": "LSTM",
+      "eer": 0.11159958209316952,
+      "far": 0.11111522786217118,
+      "frr": 0.11208393632416787,
+      "eer_percent": 11.159958209316951,
+      "far_percent": 11.111522786217117,
+      "frr_percent": 11.208393632416787,
+      "bootstrap_ci95": {
+        "eer": {
+          "mean": 0.09104242404558606,
+          "ci95_lower": 0.037682698918274776,
+          "ci95_upper": 0.18732910467130193,
+          "mean_percent": 9.104242404558606,
+          "ci95_lower_percent": 3.7682698918274777,
+          "ci95_upper_percent": 18.732910467130193
+        },
+        "far": {
+          "mean": 0.09099295931136911,
+          "ci95_lower": 0.03693198788467761,
+          "ci95_upper": 0.1891277879821569,
+          "mean_percent": 9.099295931136911,
+          "ci95_lower_percent": 3.693198788467761,
+          "ci95_upper_percent": 18.91277879821569
+        },
+        "frr": {
+          "mean": 0.09109188877980301,
+          "ci95_lower": 0.0383005219704384,
+          "ci95_upper": 0.18595963334858798,
+          "mean_percent": 9.109188877980301,
+          "ci95_lower_percent": 3.83005219704384,
+          "ci95_upper_percent": 18.595963334858798
+        }
+      }
+    },
+    {
+      "name": "FFT + centroid",
+      "eer": 0.389445560316331,
+      "far": 0.3100778065950352,
+      "frr": 0.4688133140376266,
+      "eer_percent": 38.9445560316331,
+      "far_percent": 31.00778065950352,
+      "frr_percent": 46.88133140376266,
+      "bootstrap_ci95": {
+        "eer": {
+          "mean": 0.38033088170616625,
+          "ci95_lower": 0.23366803426021243,
+          "ci95_upper": 0.5332993915134794,
+          "mean_percent": 38.03308817061662,
+          "ci95_lower_percent": 23.366803426021242,
+          "ci95_upper_percent": 53.329939151347936
+        },
+        "far": {
+          "mean": 0.38055272407395263,
+          "ci95_lower": 0.1863339687721364,
+          "ci95_upper": 0.5677453566549123,
+          "mean_percent": 38.055272407395265,
+          "ci95_lower_percent": 18.63339687721364,
+          "ci95_upper_percent": 56.774535665491236
+        },
+        "frr": {
+          "mean": 0.3801090393383799,
+          "ci95_lower": 0.21773032186823227,
+          "ci95_upper": 0.5592649662985933,
+          "mean_percent": 38.010903933837994,
+          "ci95_lower_percent": 21.773032186823226,
+          "ci95_upper_percent": 55.92649662985934
+        }
+      }
+    },
+    {
+      "name": "IID random embeddings",
+      "n_runs": 10,
+      "eer": {
+        "mean": 0.5348386334864872,
+        "std": 0.006647492447884708,
+        "sem": 0.0021021216864083826,
+        "mean_percent": 53.48386334864872,
+        "std_percent": 0.6647492447884709,
+        "sem_percent": 0.21021216864083825
+      },
+      "far": {
+        "mean": 0.5362763986661727,
+        "std": 0.008057543127530672,
+        "sem": 0.0025480188628033496,
+        "mean_percent": 53.62763986661727,
+        "std_percent": 0.8057543127530672,
+        "sem_percent": 0.25480188628033495
+      },
+      "frr": {
+        "mean": 0.5334008683068018,
+        "std": 0.008397873074177307,
+        "sem": 0.0026556406415400445,
+        "mean_percent": 53.34008683068018,
+        "std_percent": 0.8397873074177307,
+        "sem_percent": 0.26556406415400446
+      }
+    }
+  ]
+}
